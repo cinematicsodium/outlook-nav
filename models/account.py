@@ -1,27 +1,45 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
 
-from models.folder import Folder
+from outlook.enums import OutlookItemClass
+from outlook.models.folder import Folder
+from outlook.protocols import OlAccount, OlFolder, OlStore
+from outlook.utils import is_valid_ol_item
 
 
-class MailboxAccount:
-    def __init__(self, mailbox: Any):
-        self.mailbox = mailbox
+class Account:
+    def __init__(self, ol_acct_item: OlAccount):
+        self.ol_account_item = ol_acct_item
+
+    @classmethod
+    def from_outlook_item(cls, ol_acct_item: OlAccount):
+        if not is_valid_ol_item(ol_acct_item, OutlookItemClass.ACCOUNT):
+            return None
+        return cls(ol_acct_item)
 
     @property
     def name(self) -> str:
-        return str(getattr(self.mailbox, "Name", ""))
+        return self.ol_account_item.DisplayName
 
     @property
-    def folders(self) -> list[Folder]:
-        folder_collection = getattr(self.mailbox, "Folders", None)
-        if folder_collection is None:
-            return []
+    def store(self) -> OlStore:
+        return self.ol_account_item.DeliveryStore
+
+    @property
+    def root_folder(self) -> OlFolder:
+        return self.store.GetRootFolder()
+
+    @property
+    def folders(self):
         try:
-            return [Folder(folder) for folder in list(folder_collection)]
-        except TypeError:
+            ol_folders = self.root_folder.Folders
+            if not (count := ol_folders.Count):
+                return []
+            ol_accts = [ol_folders.Item(i) for i in range(1, count + 1)]
+            folders = [Folder.from_outlook_item(f) for f in ol_accts]
+            return [f for f in folders if f]
+        except Exception:
             return []
 
     def get_folder(self, folder_name: str) -> Folder | None:
@@ -48,3 +66,9 @@ class MailboxAccount:
                 return None
             current = current.get_subfolder(segment)
         return current
+
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return f"Account({self.name})"

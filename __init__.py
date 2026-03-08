@@ -1,12 +1,12 @@
-from models.account import MailboxAccount
-from models.default_folders import DefaultFolders
-from models.folder import Folder
-from models.mail_item import MailItem
-from models.outlook import OutlookApp
+from outlook.models.account import Account
+from outlook.models.default_folders import DefaultFolders
+from outlook.models.folder import Folder
+from outlook.models.mail_item import MailItem
+from outlook.models.outlook import OutlookApp
 
 __all__ = [
     "OutlookApp",
-    "MailboxAccount",
+    "Account",
     "Folder",
     "MailItem",
     "DefaultFolders",

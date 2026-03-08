@@ -1,23 +1,14 @@
 import re
+from datetime import datetime
 from enum import IntEnum
 
-
-class FolderEnum(IntEnum):
-    DELETED_ITEMS = 3
-    OUTBOX = 4
-    SENT_MAIL = 5
-    INBOX = 6
-    CALENDAR = 9
-    CONTACTS = 10
-    JOURNAL = 11
-    NOTES = 12
-    CONFLICTS = 19
-    LOCAL_FAILURES = 21
-    JUNK = 23
-    MANAGED_EMAIL = 29
-    DRAFTS = 16
-
-
+SMTP_ADDRESS_SCHEMA = "http://schemas.microsoft.com/mapi/proptag/0x39FE001E"
 EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
-
 DIGIT_REGEX = re.compile(r"[0-9]+")
+
+_TZ_TIME = datetime.now().astimezone()
+_TZ_INFO = _TZ_TIME.tzinfo
+TIMEZONE_OFFSET = _TZ_INFO.utcoffset(_TZ_TIME)
+
+DIGITAL_ID_ERROR_CODE = -2146893792
+
