@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Callable, TypeVar, overload
 
 from .constants import DIGIT_REGEX, EMAIL_REGEX, TIMEZONE_OFFSET
+from .exceptions import EmailValidationError, PathValidationError
 from .types import LowerStr
 
 T = TypeVar("T")
@@ -111,7 +112,7 @@ def _validate_emails_impl(emails: list[str]):
         valid.append(search.group())
     if errors:
         err_msg = "Email validation errors:\n" + "\n".join(errors)
-        raise ValueError(err_msg)
+        raise EmailValidationError(err_msg)
     return "; ".join(valid)
 
 
@@ -143,5 +144,5 @@ def validate_paths(paths: str | Path | Iterable[str | Path]) -> list[Path]:
         valid.append(normalized_path)
     if errors:
         err_msg = "Path validation errors:\n" + "\n".join(errors)
-        raise ValueError(err_msg)
+        raise PathValidationError(err_msg)
     return valid

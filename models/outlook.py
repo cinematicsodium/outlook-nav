@@ -4,6 +4,7 @@ import logging
 from types import TracebackType
 
 from ..enums import FolderType
+from ..exceptions import OutlookConnectionError
 from ..models.account import Account
 from ..models.default_folders import DefaultFolders
 from ..models.folder import Folder
@@ -22,7 +23,7 @@ def _load_win32_client() -> OlDispatch:
 
         return com_client
     except ImportError as exc:
-        raise RuntimeError(
+        raise OutlookConnectionError(
             "win32com.client is required to use OutlookApp. Install pywin32 on Windows."
         ) from exc
 
@@ -270,7 +271,7 @@ class OutlookApp:
     def _require_connection(self) -> OlApplication:
         """Return Outlook connection or raise if unavailable."""
         if self._connection is None:
-            raise RuntimeError(
+            raise OutlookConnectionError(
                 "Outlook connection is not available. Call connect() first."
             )
         return self._connection
@@ -278,7 +279,7 @@ class OutlookApp:
     def _require_namespace(self) -> OlNamespace:
         """Return Outlook namespace or raise if unavailable."""
         if self._namespace is None:
-            raise RuntimeError(
+            raise OutlookConnectionError(
                 "Outlook namespace is not available. Call connect() first."
             )
         return self._namespace
