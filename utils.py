@@ -52,6 +52,8 @@ def resolve_method(obj: Any, method_name: str, *args: Any, **kwargs: Any) -> T |
 
 
 def is_interface_error(e: Exception):
+    if pywintypes is None:
+        return False
     return isinstance(e, pywintypes.com_error)
 
 
