@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import typer
 
 from ..enums import FolderType
+from ..exceptions import OutlookConnectionError
 from ..models.account import Account
 from ..models.folder import Folder
 from ..models.outlook import OutlookApp
@@ -52,7 +53,7 @@ def create_client(ctx: typer.Context) -> OutlookApp:
 
     try:
         return OutlookApp(mailbox_address=mailbox_address)
-    except RuntimeError as exc:
+    except OutlookConnectionError as exc:
         abort(
             f"{exc} This CLI requires Microsoft Outlook and pywin32 on Windows."
         )

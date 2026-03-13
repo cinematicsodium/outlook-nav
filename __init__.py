@@ -1,3 +1,10 @@
+from .exceptions import (
+    EmailValidationError,
+    OutlookConnectionError,
+    OutlookError,
+    OutlookValidationError,
+    PathValidationError,
+)
 from .models.account import Account
 from .models.default_folders import DefaultFolders
 from .models.folder import Folder
@@ -10,4 +17,9 @@ __all__ = [
     "Folder",
     "MailItem",
     "DefaultFolders",
+    "OutlookError",
+    "OutlookConnectionError",
+    "OutlookValidationError",
+    "EmailValidationError",
+    "PathValidationError",
 ]
