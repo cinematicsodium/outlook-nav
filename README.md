@@ -1,4 +1,4 @@
-# outlook
+# outlook-nav
 
 `outlook-nav` is a small Python wrapper around the Microsoft Outlook COM API. It gives you a cleaner interface for working with mailboxes, folders, and email messages from Python, and it also exposes a Typer-based CLI for common inspection and draft-creation tasks.
 
