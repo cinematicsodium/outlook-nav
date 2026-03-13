@@ -1,7 +1,7 @@
 from enum import IntEnum
 
 
-class DefaultFolderEnum(IntEnum):
+class FolderType(IntEnum):
     DELETED_ITEMS = 3
     OUTBOX = 4
     SENT_MAIL = 5

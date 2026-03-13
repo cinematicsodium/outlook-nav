@@ -1,29 +1,29 @@
 from __future__ import annotations
 
-import logging
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
 
-from outlook.constants import OutlookItemClass
-from outlook.protocols import OlMailItem
-from outlook.utils import (
-    get_smtp_address,
-    is_valid_ol_item,
-    resolve_property,
-    validate_datetime,
-    validate_email,
-    validate_paths,
-)
+from tabulate import tabulate
 
-log = logging.getLogger(__name__)
+from ..enums import ItemType
+from ..logger import log
+from ..protocols import OlMailItem
+from ..utils import (
+    get_smtp_address,
+    is_accessible_ol_item,
+    resolve_property,
+    unpack_collection,
+)
+from ..validation import validate_datetime, validate_email, validate_paths
 
 if TYPE_CHECKING:
-    from outlook.models.folder import Folder
+    from .address_entry import AddressEntry
+    from .folder import Folder
 
 
-class RecipientsData(TypedDict):
+class RecipientInfo(TypedDict):
     name: str
     address: str
 
@@ -36,13 +36,13 @@ class MailItemData(TypedDict):
     to: str
     cc: str
     bcc: str
-    recipients: RecipientsData
+    recipients: list[RecipientInfo]
     subject: str
     body: str
     attachments: list[str]
-    scheduled_delivery_time: datetime
-    sent_time: datetime
-    received_time: datetime
+    scheduled_delivery_time: datetime | None
+    sent_time: datetime | None
+    received_time: datetime | None
     size: int
 
 
@@ -50,20 +50,25 @@ class MailItem:
     def __init__(self, item: Any):
         self.ol_mail_item: OlMailItem = item
         self._message_table: Any = None
+        if not self.is_accessible_mail_item(item):
+            raise ValueError("Provided Outlook item is not an accessible mail item.")
 
     @classmethod
     def from_outlook_item(cls, item: Any) -> MailItem | None:
-        if not is_valid_ol_item(
-            item=item,
-            target_type=OutlookItemClass.MAIL_ITEM,
-            properties=MailItem.interface_properties(),
-        ):
+        if not cls.is_accessible_mail_item(item):
             return None
-
         return cls(item)
 
-    @staticmethod
-    def interface_properties():
+    @classmethod
+    def is_accessible_mail_item(cls, item: Any) -> bool:
+        return is_accessible_ol_item(
+            item=item,
+            target_type=ItemType.MAIL_ITEM,
+            properties=cls.interface_properties(),
+        )
+
+    @classmethod
+    def interface_properties(cls) -> tuple[str, ...]:
         return (
             "SenderEmailAddress",
             "SentOnBehalfOfName",
@@ -80,55 +85,53 @@ class MailItem:
             "ConversationID",
         )
 
-    @property
-    def entry_id(self):
-        """
-        The unique hexadecimal identifier for the Outlook item.
-
-        Note:
-            This ID is storage-dependent. Moving the item between different
-            stores (e.g., from a mailbox to a .pst file) will change the ID.
-        """
-        return self.ol_mail_item.EntryID
+    # ---- Identity / Threading -------------------------------------------------
 
     @property
-    def conversation_id(self):
-        """
-        A unique string identifying all messages within the same thread.
-
-        Used to relate replies and forwards across different folders.
-        """
-        return self.ol_mail_item.ConversationID
+    def entry_id(self) -> str:
+        """The unique hexadecimal identifier for the Outlook item."""
+        return self.ol_mail_item.EntryID or ""
 
     @property
-    def conversation_index(self):
-        """
-        A hexadecimal string representing the message's hierarchical position in a thread.
-
-        The root message is `44` characters long (`22` bytes), with `10` characters
-        (`5` bytes) appended for each subsequent reply level.
-        """
-        return self.ol_mail_item.ConversationIndex
+    def dynamic_uuid(self) -> str:
+        """A dynamic unique identifier for the email item, derived from the entry ID."""
+        return self.entry_id or ""
 
     @property
-    def parent_folder(self):
-        """returns the Folder containing the mail item."""
-        from .folder import Folder
+    def conversation_id(self) -> str:
+        """A unique string identifying all messages within the same thread."""
+        return self.ol_mail_item.ConversationID or ""
 
+    @property
+    def conversation_index(self) -> str:
+        """A hexadecimal string representing the message's hierarchical position in a thread."""
+        return self.ol_mail_item.ConversationIndex or ""
+
+    @property
+    def uuid(self) -> str:
+        """A unique identifier for the email item, derived from the conversation index."""
+        return self.conversation_index or ""
+
+    @property
+    def parent_folder(self) -> Folder | None:
+        """Returns the Folder containing the mail item."""
         return Folder.from_outlook_item(self.ol_mail_item.Parent)
+
+    # ---- Sender / Recipients --------------------------------------------------
+
+    @property
+    def sender(self) -> AddressEntry | None:
+        """Returns an AddressEntry object representing the email sender."""
+        return AddressEntry.from_outlook_item(self.ol_mail_item.Sender)
 
     @property
     def sender_name(self) -> str:
-        """returns the display name of the email sender."""
+        """Returns the display name of the email sender."""
         return str(self.ol_mail_item.SenderName)
 
     @property
     def sender_address(self) -> str:
         """Retrieves the sender's email address in lowercase format."""
-        addresses = (
-            get_smtp_address(self.ol_mail_item.Sender),
-            self.ol_mail_item.SenderEmailAddress,
-        )
         if address := get_smtp_address(self.ol_mail_item.Sender):
             return address.lower()
         if address := self.ol_mail_item.SenderEmailAddress:
@@ -172,31 +175,26 @@ class MailItem:
         self.ol_mail_item.BCC = validate_email(value)
 
     @property
-    def recipients(self):
-        """Returns a dictionary mapping each recipient's email address (str) to a nested dictionary containing their name and address details."""
-        recipients_data: dict[str, RecipientsData] = {}
-        try:
-            recipients = self.ol_mail_item.Recipients
-            if not recipients.Count:
-                return recipients_data
+    def recipients(self) -> list[RecipientInfo]:
+        """Returns a list of RecipientInfo dictionaries for all recipients of the email."""
+        ol_recipients = unpack_collection(self.ol_mail_item.Recipients)
+        if not ol_recipients:
+            return []
 
-            for i in range(recipients.Count + 1):
+        recipients: list[RecipientInfo] = []
+        for recipient in ol_recipients:
+            address_entry = AddressEntry.from_outlook_item(recipient.AddressEntry)
+            if address_entry:
+                name = address_entry.name
+                address = address_entry.address
+            else:
+                name = recipient.Name
+                address = recipient.Address
 
-                recipient = recipients.Item(i)
-                recipient_name = recipient.Name
-                recipient_address = ""
+            recipients.append(RecipientInfo(name=name, address=address))
+        return recipients
 
-                if smtp_address := get_smtp_address(recipient.AddressEntry):
-                    recipient_address = smtp_address
-
-                recipients_data[recipient_address] = {
-                    "name": recipient_name,
-                    "address": recipient_address,
-                }
-
-        except Exception:
-            pass
-        return recipients_data
+    # ---- Content ---------------------------------------------------------------
 
     @property
     def subject(self) -> str:
@@ -218,7 +216,7 @@ class MailItem:
 
     @property
     def html_body(self) -> str:
-        """Gets or sets the HTML formatted content of the email body with validation for root tags."""
+        """Gets or sets HTML formatted content of the email body."""
         return self._fmt_body(self.ol_mail_item.HTMLBody)
 
     @html_body.setter
@@ -230,7 +228,7 @@ class MailItem:
 
     @property
     def table(self):
-        """Gets or sets a Word-based table object within the email body using the internal inspector."""
+        """Gets or sets a Word-based table object within the email body."""
         return self._message_table
 
     @table.setter
@@ -245,45 +243,43 @@ class MailItem:
 
     @property
     def attachments(self) -> list[str]:
-        """Gets a list of filenames for all current attachments or adds new attachments to the message."""
-        attachments = self.ol_mail_item.Attachments
-        results = []
-        if attachments is not None and attachments.Count > 0:
-            for i in range(attachments.Count):
-                try:
-                    results.append(attachments.Item(i + 1).FileName)
-                except Exception:
-                    pass
-        return results
+        """Gets a list of filenames for all current attachments."""
+        ol_attachments = unpack_collection(self.ol_mail_item.Attachments)
+        attachment_names = [
+            str(att.FileName) for att in ol_attachments if att and att.FileName
+        ]
+        return attachment_names
 
     @attachments.setter
     def attachments(self, value: str | Path | list[str | Path]) -> None:
+        """Sets the attachments for the email item, replacing any existing attachments."""
         self.add_attachments(value)
 
     def add_attachments(self, path: str | Path | list[str | Path]) -> None:
-        """Attaches one or more files to the email item after validating the provided paths."""
+        """Attaches one or more files to the email item."""
         valid_paths = validate_paths(path)
         for valid_path in valid_paths:
             self.ol_mail_item.Attachments.Add(str(valid_path))
 
+    # ---- Timing / Status -------------------------------------------------------
+
     @property
     def scheduled_delivery_time(self) -> datetime | None:
-        """Gets or sets the date and time for deferred delivery of the email message."""
+        """Gets or sets the date and time for deferred delivery."""
         return self.ol_mail_item.DeferredDeliveryTime
 
     @scheduled_delivery_time.setter
     def scheduled_delivery_time(self, value: datetime | None) -> None:
-        validated = validate_datetime(value)
-        self.ol_mail_item.DeferredDeliveryTime = validated
+        self.ol_mail_item.DeferredDeliveryTime = validate_datetime(value)
 
     @property
     def sent_time(self) -> datetime | None:
-        """Returns the timestamp indicating when the email message was sent."""
+        """Returns when the email message was sent."""
         return self.ol_mail_item.SentOn
 
     @property
     def received_time(self) -> datetime | None:
-        """Returns the timestamp indicating when the email message was received."""
+        """Returns when the email message was received."""
         return self.ol_mail_item.ReceivedTime
 
     @property
@@ -293,7 +289,7 @@ class MailItem:
 
     @property
     def is_unread(self) -> bool:
-        """Gets or sets a boolean indicating whether the email message is marked as unread."""
+        """Gets or sets whether the email message is unread."""
         return self.ol_mail_item.UnRead
 
     @is_unread.setter
@@ -306,18 +302,17 @@ class MailItem:
         self.ol_mail_item.UnRead = value
 
     @property
-    def _dispatch(self):
-        """Internal property that returns the primary timestamp or draft status of the email."""
-        return self.sent_time or self.received_time or "Draft"
+    def _dispatch(self) -> str:
+        """Internal property for primary timestamp or draft status."""
+        return str(self.sent_time or self.received_time or "Draft")
 
-    def display(self):
-        """Opens the Outlook inspector window to display the email item to the user."""
+    # ---- Actions ----------------------------------------------------------------
+
+    def display(self) -> None:
         self.ol_mail_item.Display()
 
     def send(self) -> None:
-        """Validates sender and recipient requirements before transmitting the email via Outlook."""
         senders = [self.sender_address, self.sent_on_behalf_of_address]
-
         if not any(senders):
             raise ValueError(
                 f"Unable to send email '{self.subject}': No sender identified. "
@@ -325,7 +320,6 @@ class MailItem:
             )
 
         recipients = [self.to, self.cc, self.bcc]
-
         if not any(recipients):
             raise ValueError(
                 f"Unable to send email '{self.subject}': At least one recipient must be "
@@ -338,48 +332,44 @@ class MailItem:
             self.body = self.table
 
         try:
+            self.display()
             self.ol_mail_item.Send()
         except Exception as e:
             log.error(
                 f"Outlook COM Error: Failed to transmit email '{self.subject}'. Details: {e}"
             )
 
-        return
-
     def save(self) -> None:
-        """Saves any modifications made to the email item in its current folder."""
         try:
             self.ol_mail_item.Save()
         except Exception as e:
             log.error(f"Failed to save changes to email '{self.subject}': {e}")
 
     def delete(self) -> None:
-        """Permanently removes the email item from its current folder."""
         try:
             self.ol_mail_item.Delete()
         except Exception as e:
             log.error(f"Failed to delete email '{self.subject}': {e}")
 
     def move_to(self, destination: Folder) -> MailItem | None:
-        """Transfers the email item to a new folder and returns the moved item instance."""
-        from outlook.models.folder import Folder
 
         if not isinstance(destination, Folder):
             raise TypeError(
                 f"Invalid destination type for 'move_to'. Expected an instance of "
                 f"'{Folder.__module__}.Folder', but received '{type(destination).__name__}'."
             )
+
         try:
             moved_item = self.ol_mail_item.Move(destination._ol_folder_item)
-            if moved_item and moved_item.Class == OutlookItemClass.MAIL_ITEM:
+            if moved_item and moved_item.Class == ItemType.MAIL_ITEM:
                 return MailItem.from_outlook_item(moved_item)
         except Exception as e:
             log.error(
                 f"Failed to move email '{self.subject}' to folder '{destination.name}': {e}"
             )
+        return None
 
     def update(self, **fields: Any) -> None:
-        """Performs a bulk update on multiple email fields and saves the changes."""
         allowed_fields = {
             "to",
             "cc",
@@ -402,17 +392,17 @@ class MailItem:
         self.save()
 
     def get(self, key: Any, default=None):
-        """Safely retrieves a property value from either the wrapper class or the underlying Outlook object."""
         if hasattr(self, key):
             return getattr(self, key)
         if hasattr(self.ol_mail_item, key):
             return getattr(self.ol_mail_item, key)
         return default
 
-    def to_dict(self) -> MailItemData:
-        """Serializes the core properties of the email item into a structured dictionary format."""
+    # ---- Serialization ----------------------------------------------------------
+
+    def _to_dict(self) -> MailItemData:
         return MailItemData(
-            conversation_index=self.entry_id,
+            conversation_index=self.conversation_index,
             conversation_id=self.conversation_id,
             sender_address=self.sender_address,
             sent_on_behalf_of_address=self.sent_on_behalf_of_address,
@@ -424,13 +414,45 @@ class MailItem:
             body=self.body,
             attachments=self.attachments,
             scheduled_delivery_time=self.scheduled_delivery_time,
+            sent_time=self.sent_time,
             received_time=self.received_time,
             size=self.size,
         )
 
     def as_dict(self) -> MailItemData:
-        """Converts the email item properties into a dictionary format by calling the `.to_dict()` method."""
-        return self.to_dict()
+        return self._to_dict()
+
+    def _to_table(self) -> str:
+        body = self.body or self.html_body or ""
+        fmtd_body = self._fmt_body(body)
+
+        attachments = f"{len(self.attachments)} files(s)"
+        parent_folder = self.parent_folder.name if self.parent_folder else ""
+
+        table_data = (
+            ("Subject", self.subject),
+            ("Sender", self.sender_address),
+            ("To", self.to),
+            ("CC", self.cc),
+            ("BCC", self.bcc),
+            ("Sent On Behalf Of", self.sent_on_behalf_of_address),
+            ("Sent Time", self._fmt_dt(self.sent_time)),
+            ("Received Time", self._fmt_dt(self.received_time)),
+            ("Body", fmtd_body),
+            ("Attachments", attachments),
+            ("Size", self.size),
+            ("Parent Folder", parent_folder),
+            ("Conversation ID", self.conversation_id),
+            ("Conversation Index", self.conversation_index),
+            ("Entry ID", self.entry_id),
+        )
+        table = tabulate(table_data, tablefmt="grid", maxcolwidths=80)
+        return table
+
+    def as_table(self) -> str:
+        return self._to_table()
+
+    # ---- Internals / Dunder ----------------------------------------------------
 
     def _fmt_body(self, body: str):
         if not body or not isinstance(body, str):
@@ -439,18 +461,23 @@ class MailItem:
         body = body.replace("\r", "\n")
         lines = body.splitlines()
         fmtd_lines = [line.strip() for line in lines if line.strip()]
-        fmtd_body = "\n".join(fmtd_lines)
+        return "\n".join(fmtd_lines)
 
-        return fmtd_body
+    def _fmt_dt(self, dt: datetime | None) -> str:
+        if dt is None:
+            return ""
+        try:
+            if abs(dt.year - datetime.now().year) >= 1000:
+                return ""
+            return str(dt)
+        except Exception:
+            return ""
 
     def __str__(self) -> str:
         return f"[{self._dispatch}] {self.sender_address}: {self.subject}"
 
     def __repr__(self) -> str:
-
         return (
-            f"parent_folder={self.parent_folder.name}, "
-            f"dispatch={self._dispatch}, "
-            f"subject={self.subject}, "
-            f"sender={self.sender_address})"
+            f"MailItem(subject={self.subject!r}, sender_address={self.sender_address!r}, "
+            f"to={self.to!r}, sent_time={self.sent_time!r})"
         )

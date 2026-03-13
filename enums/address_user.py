@@ -1,6 +1,7 @@
 from enum import IntEnum
 
-class AddressUserEnum(IntEnum):
+
+class AddressUserType(IntEnum):
     EXCHANGE_USER = 0
     EXCHANGE_DISTRIBUTION_LIST = 1
     EXCHANGE_PUBLIC_FOLDER = 2

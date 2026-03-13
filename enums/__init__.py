@@ -1,9 +1,9 @@
-from .address_user import AddressUserEnum
-from .default_folder import DefaultFolderEnum
-from .item_class import OutlookItemClass
+from .address_user import AddressUserType
+from .default_folder import FolderType
+from .item_type import ItemType
 
 __all__ = [
-    "AddressUserEnum",
-    "DefaultFolderEnum",
-    "OutlookItemClass",
+    "AddressUserType",
+    "FolderType",
+    "ItemType",
 ]

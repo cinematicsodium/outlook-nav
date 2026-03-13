@@ -1,7 +1,7 @@
 from enum import IntEnum
 
 
-class OutlookItemClass(IntEnum):
+class ItemType(IntEnum):
     """
     Outlook Object Class constants.
 
@@ -12,7 +12,7 @@ class OutlookItemClass(IntEnum):
     # ── Core application objects ──────────────────────────────────────────────
     APPLICATION = 0  # Application object.
     NAMESPACE = 1  # NameSpace object.
-    FOLDER = 2  # Folder object.
+    FOLDER = 2  # Folder object.
     FOLDERS = 15  # Folders collection.
 
     # ── Stores / accounts ─────────────────────────────────────────────────────

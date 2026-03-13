@@ -1,0 +1,16 @@
+from __future__ import annotations
+
+from ..enums import ItemType
+from ..types import T
+from .ol_item import OlItem
+from .ol_namespace import OlNamespace
+
+
+class OlApplication(OlItem):
+    def GetNamespace(self, type: str = "MAPI") -> OlNamespace: ...
+    def CreateItem(self, item_type: ItemType | int) -> T: ...
+    def Quit(self) -> None: ...
+
+    # Context manager support for 'with' blocks
+    def __enter__(self) -> OlApplication: ...
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None: ...
