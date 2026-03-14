@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from enum import IntEnum
-from typing import Any, TYPE_CHECKING, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 
 if TYPE_CHECKING:
-    from outlook.models.node import ItemModel
+    from .models.node import ItemModel
 
 try:
     import pywintypes  # type: ignore
