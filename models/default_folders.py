@@ -5,13 +5,15 @@ from collections.abc import Iterator
 from ..enums import FolderType, ItemType
 from ..logger import log
 from ..models.folder import Folder
+from ..models.node import ItemModel
 from ..protocols import OlNamespace
-from ..utils import is_accessible_ol_item
 
 
-class DefaultFolders:
+class DefaultFolders(ItemModel):
     """Manages Outlook default folders."""
 
+    item_type = ItemType.NAMESPACE
+    inaccessible_error_message = "Provided Outlook item is not an accessible namespace."
     _NAME_MAP: dict[str, FolderType] = {
         "deleted_items": FolderType.DELETED_ITEMS,
         "outbox": FolderType.OUTBOX,
@@ -29,29 +31,14 @@ class DefaultFolders:
 
     def __init__(self, namespace: OlNamespace):
         """Initialize with Outlook namespace."""
-        self._namespace = namespace
+        super().__init__(namespace)
+        self._ol_namespace = namespace
         self._cache: dict[FolderType, Folder | None] = {}
 
-        if not self.is_accessible_namespace(namespace):
-            raise ValueError("Provided namespace is not accessible or valid.")
-
     @classmethod
-    def from_namespace(cls, namespace: OlNamespace) -> DefaultFolders | None:
-        if not cls.is_accessible_namespace(namespace):
-            return None
-        return cls(namespace)
-
-    @classmethod
-    def is_accessible_namespace(cls, item: OlNamespace) -> bool:
-        return is_accessible_ol_item(
-            item=item,
-            target_type=ItemType.NAMESPACE,
-        )
-
-    @staticmethod
-    def folder_name_map() -> dict[str, FolderType]:
+    def folder_name_map(cls) -> dict[str, FolderType]:
         """Return mapping of folder names to enums."""
-        return dict(DefaultFolders._NAME_MAP)
+        return dict(cls._NAME_MAP)
 
     @property
     def deleted_items(self) -> Folder | None:
@@ -116,14 +103,15 @@ class DefaultFolders:
     @property
     def all(self) -> list[Folder]:
         """Return all default folders as a list."""
-        return list(self._to_dict().values())
+        return self.as_list()
 
     def _to_dict(self) -> dict[str, Folder]:
         """Return dictionary of default folders."""
         data: dict[str, Folder | None] = {
             name: self.get(name) for name in self.folder_name_map()
         }
-        return {k: v for k, v in data.items() if v is not None}
+        dct = {k: v for k, v in data.items() if v is not None}
+        return dct
 
     def as_dict(self) -> dict[str, Folder]:
         """Return default folders as a dictionary."""
@@ -131,7 +119,7 @@ class DefaultFolders:
 
     def _to_list(self) -> list[Folder]:
         """Return list of default folders."""
-        return list(self._to_dict().values())
+        return list(self.as_dict().values())
 
     def as_list(self) -> list[Folder]:
         """Return default folders as a list."""
@@ -147,7 +135,7 @@ class DefaultFolders:
             return self._cache[folder_type]
 
         try:
-            ol_folder = self._namespace.GetDefaultFolder(folder_type)
+            ol_folder = self._ol_namespace.GetDefaultFolder(folder_type)
             resolved_folder = Folder(ol_folder)
             self._cache[folder_type] = resolved_folder
             return resolved_folder

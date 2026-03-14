@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from ..enums import FolderType, ItemType
 from ..protocols import OlFolder
 from ..utils import unpack_collection
-from .node import ItemModel
 from .mail_item import MailItem
+from .node import ItemModel
 
 logger = logging.getLogger(__name__)
 
@@ -35,27 +35,7 @@ class Folder(ItemModel):
     def __init__(self, outlook_item: OlFolder) -> None:
         """Initialize Folder with an Outlook item."""
         super().__init__(outlook_item)
-        self._ol_folder_item: OlFolder = outlook_item
-
-    @classmethod
-    def is_folder_accessible(cls, item: object) -> bool:
-        """Check if the Outlook folder item is accessible."""
-        return cls.is_accessible(item)
-
-    @classmethod
-    def interface_properties(cls) -> tuple[str, str, str]:
-        """Return interface properties for Outlook folder."""
-        return cls.required_properties
-
-    @staticmethod
-    def _is_default_folder(item: OlFolder) -> bool:
-        """Check if the folder is a default Outlook folder.
-
-        This implementation cannot reliably determine default folders from the
-        limited Outlook interop surface exposed here, so it conservatively
-        reports False.
-        """
-        return False
+        self._ol_folder_item = outlook_item
 
     @property
     def name(self) -> str:
@@ -63,18 +43,9 @@ class Folder(ItemModel):
         return self._ol_folder_item.Name
 
     @property
-    def outlook_item(self) -> OlFolder:
-        """Expose the wrapped Outlook folder for internal integrations."""
-        return self._ol_folder_item
-
-    @property
-    def folder_type(self) -> FolderType | None:
-        """Return the default-folder enum when this folder maps to one.
-
-        The default-folder identity cannot be derived from the wrapped Outlook
-        item at this layer, so this property always returns None.
-        """
-        return None
+    def folder_type(self) -> str | None:
+        """Return the folder type name based on the Outlook item type."""
+        return FolderType.get_folder_type(self._ol_folder_item.Class) or "Undefined"
 
     @property
     def mail_items(self) -> list[MailItem]:
@@ -108,7 +79,9 @@ class Folder(ItemModel):
     def iter_subfolders(self) -> Iterable[Folder]:
         """Iterate over accessible child folders."""
         try:
-            subfolders = unpack_collection(self._ol_folder_item.Folders, transformer=Folder)
+            subfolders = unpack_collection(
+                self._ol_folder_item.Folders, transformer=Folder
+            )
             yield from subfolders
         except Exception:
             return
@@ -203,13 +176,9 @@ class Folder(ItemModel):
             raise ValueError("mail_item must be a MailItem")
         mail_item.delete()
 
-    def extend_items(self, values: Iterable[MailItem]) -> list[MailItem]:
-        """Extend mail items with values."""
-        return list(values)
-
     def delete(self) -> None:
         """Delete this folder."""
-        if self._is_default_folder(self._ol_folder_item):
+        if FolderType.is_default_folder(self._ol_folder_item.Class):
             raise ValueError(f"Cannot delete default folder: {self.folder_type}")
         try:
             self._ol_folder_item.Delete()

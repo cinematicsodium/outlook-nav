@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, cast, overload
 
 if TYPE_CHECKING:
     from .models.node import ItemModel
@@ -113,8 +113,8 @@ def unpack_collection(
 def unpack_collection(
     collection: OlCollection[T] | None,
     *,
-    transformer: type[ItemModel] | None = None,
-) -> list[T] | list[ItemModel]:
+    transformer: type[ModelT] | None = None,
+) -> list[T] | list[ModelT]:
     if collection is None:
         return []
 

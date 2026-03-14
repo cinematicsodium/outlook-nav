@@ -61,18 +61,10 @@ class MailItem(ItemModel):
     )
     inaccessible_error_message = "Provided Outlook item is not an accessible mail item."
 
-    def __init__(self, item: Any):
+    def __init__(self, item: OlMailItem):
         super().__init__(item)
-        self.ol_mail_item: OlMailItem = item
+        self.ol_mail_item = item
         self._message_table: Any = None
-
-    @classmethod
-    def is_accessible_mail_item(cls, item: Any) -> bool:
-        return cls.is_accessible(item)
-
-    @classmethod
-    def interface_properties(cls) -> tuple[str, ...]:
-        return cls.required_properties
 
     # ---- Identity / Threading -------------------------------------------------
 
@@ -84,7 +76,7 @@ class MailItem(ItemModel):
     @property
     def dynamic_uuid(self) -> str:
         """A dynamic unique identifier for the email item, derived from the entry ID."""
-        return self.entry_id or ""
+        return self.entry_id
 
     @property
     def conversation_id(self) -> str:
@@ -99,7 +91,7 @@ class MailItem(ItemModel):
     @property
     def uuid(self) -> str:
         """A unique identifier for the email item, derived from the conversation index."""
-        return self.conversation_index or ""
+        return self.conversation_index
 
     @property
     def parent_folder(self) -> Folder | None:
@@ -125,9 +117,7 @@ class MailItem(ItemModel):
         """Retrieves the sender's email address in lowercase format."""
         if address := get_smtp_address(self.ol_mail_item.Sender):
             return address.lower()
-        if address := self.ol_mail_item.SenderEmailAddress:
-            return address.lower()
-        return ""
+        return str(self.ol_mail_item.SenderEmailAddress or "").lower()
 
     @property
     def sent_on_behalf_of_address(self) -> str:
@@ -168,32 +158,14 @@ class MailItem(ItemModel):
     @property
     def recipients(self) -> list[RecipientInfo]:
         """Returns a list of RecipientInfo dictionaries for all recipients of the email."""
-        ol_recipients = self.ol_mail_item.Recipients
-        recipients: list[RecipientInfo] = []
-        for recipient in ol_recipients:
-            name: str | None = None
-            address: str | None = None
-
-            # Try to resolve via the underlying AddressEntry first
-            address_entry = getattr(recipient, "AddressEntry", None)
-            if address_entry is not None:
-                try:
-                    entry = AddressEntry.from_outlook_item(address_entry)
-                except Exception:  # Fallback to Recipient properties if AddressEntry resolution fails
-                    entry = None
-                if entry is not None:
-                    name = entry.name
-                    address = entry.address
-
-            # Fallback: use Recipient.Name / Recipient.Address if needed
-            if name is None:
-                name = getattr(recipient, "Name", "")
-            if address is None:
-                address = getattr(recipient, "Address", "")
-
-            recipients.append(RecipientInfo(name=name, address=address))
-
-        return recipients
+        recipients = unpack_collection(
+            self.ol_mail_item.Recipients, transformer=AddressEntry
+        )
+        recipient_info = [
+            RecipientInfo(name=entry.name, address=entry.email_address)
+            for entry in recipients
+        ]
+        return recipient_info
 
     # ---- Content ---------------------------------------------------------------
 
@@ -218,7 +190,7 @@ class MailItem(ItemModel):
     @property
     def html_body(self) -> str:
         """Gets or sets HTML formatted content of the email body."""
-        return self._fmt_body(self.ol_mail_item.HTMLBody)
+        return self.ol_mail_item.HTMLBody
 
     @html_body.setter
     def html_body(self, value: str) -> None:
@@ -361,7 +333,7 @@ class MailItem(ItemModel):
             )
 
         try:
-            moved_item = self.ol_mail_item.Move(destination.outlook_item)
+            moved_item = self.ol_mail_item.Move(destination._ol_folder_item)
             if moved_item and moved_item.Class == ItemType.MAIL_ITEM:
                 return MailItem.from_outlook_item(moved_item)
         except Exception as e:

@@ -22,12 +22,12 @@ def list_mailboxes(ctx: typer.Context) -> None:
     for account in client.list_mailboxes():
         matches_global_selection = account.matches(selected_mailbox)
         is_default_account = default_account is not None and account.matches(
-            default_account.address
+            default_account.email_address
         )
         rows.append(
             (
                 account.name,
-                account.address,
+                account.email_address,
                 len(account.folders),
                 "yes" if matches_global_selection or is_default_account else "",
             )

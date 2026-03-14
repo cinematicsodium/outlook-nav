@@ -4,7 +4,6 @@ from collections.abc import Iterable
 
 from ..enums import ItemType
 from ..protocols import OlAccount, OlStore
-from ..utils import unpack_collection
 from .folder import Folder
 from .node import ItemModel
 
@@ -19,27 +18,22 @@ class Account(ItemModel):
     def __init__(self, ol_acct_item: OlAccount) -> None:
         """Initialize Account with an Outlook account item."""
         super().__init__(ol_acct_item)
-        self.ol_account_item: OlAccount = ol_acct_item
-
-    @classmethod
-    def is_accessible_acct(cls, item: OlAccount) -> bool:
-        """Check if the given item is an accessible Outlook account."""
-        return cls.is_accessible(item)
+        self._ol_account_item = ol_acct_item
 
     @property
     def name(self) -> str:
         """Return the display name of the account."""
-        return self.ol_account_item.DisplayName
+        return self._ol_account_item.DisplayName
 
     @property
-    def address(self) -> str:
+    def email_address(self) -> str:
         """Return the email address of the account."""
-        return self.ol_account_item.SmtpAddress
+        return self._ol_account_item.SmtpAddress
 
     @property
     def store(self) -> OlStore:
         """Return the default store associated with this account."""
-        return self.ol_account_item.DeliveryStore
+        return self._ol_account_item.DeliveryStore
 
     @property
     def root_folder(self) -> Folder | None:
@@ -49,14 +43,9 @@ class Account(ItemModel):
     @property
     def folders(self) -> list[Folder]:
         """Return a list of folders in the account's root folder."""
-        root = self.root_folder
-        if root is None:
+        if (root := self.root_folder) is None:
             return []
-        try:
-            folders = unpack_collection(root.outlook_item.Folders, transformer=Folder)
-            return folders
-        except Exception:
-            return []
+        return root.subfolders
 
     def get_folder(self, folder_name: str) -> Folder | None:
         """Return a folder by its name."""
@@ -70,14 +59,13 @@ class Account(ItemModel):
 
     def find_folder(self, path: str | Iterable[str]) -> Folder | None:
         """Find a folder by path or iterable of folder names."""
+
+        parts: list[str]
+
         if isinstance(path, str):
-            parts: list[str] = [
-                segment.strip() for segment in path.split("/") if segment.strip()
-            ]
+            parts = [segment.strip() for segment in path.split("/") if segment.strip()]
         else:
-            parts: list[str] = [
-                str(segment).strip() for segment in path if str(segment).strip()
-            ]
+            parts = [str(segment).strip() for segment in path if str(segment).strip()]
 
         if not parts:
             return None
@@ -94,7 +82,7 @@ class Account(ItemModel):
         if not value:
             return False
         target = value.lower()
-        return target in {self.name.lower(), self.address.lower()}
+        return target in {self.name.lower(), self.email_address.lower()}
 
     def __str__(self) -> str:
         """Return the display name of the account."""

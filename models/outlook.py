@@ -108,7 +108,7 @@ class OutlookApp:
 
     def _log_account_not_found(self, email: str, accounts: list[Account]) -> None:
         """Log a warning if the account is not found."""
-        addresses = [account.address.lower() for account in accounts]
+        addresses = [account.email_address.lower() for account in accounts]
         msg = f"Account '{email}' not found among {len(accounts)} accounts. "
         msg += "Available accounts:\n"
         msg += "\n".join(f"- {address}" for address in addresses)
@@ -119,10 +119,15 @@ class OutlookApp:
         """Return DefaultFolders instance for Outlook's default folders."""
         if self._default_folders is None:
             namespace = self._require_namespace()
-            default_folders = DefaultFolders.from_namespace(namespace)
+
+            default_folders = DefaultFolders.from_outlook_item(namespace)
             if default_folders is None:
-                logger.error("Unable to initialize default Outlook folders from namespace")
-                raise OutlookConnectionError("Unable to initialize default Outlook folders.")
+                logger.error(
+                    "Unable to initialize default Outlook folders from namespace"
+                )
+                raise OutlookConnectionError(
+                    "Unable to initialize default Outlook folders."
+                )
             self._default_folders = default_folders
         return self._default_folders
 
@@ -196,7 +201,7 @@ class OutlookApp:
             connection = self._require_connection()
             mail_item: OlMailItem = connection.CreateItem(0)
             if self.mailbox_account:
-                mail_item.SendUsingAccount = self.mailbox_account.ol_account_item
+                mail_item.SendUsingAccount = self.mailbox_account._ol_account_item
             return MailItem.from_outlook_item(mail_item)
         except Exception:
             logger.error("Error creating email")
@@ -293,7 +298,8 @@ class OutlookApp:
     def _ensure_item_type(self, item: object, target_type: type[T]) -> T:
         """Helper to validate and return an Outlook item of the expected type."""
         if not isinstance(item, target_type):
-            item_str = type(item).__name__
-            target_str = target_type.__name__
-            raise TypeError(f"Expected item of type {target_str}, got {item_str}")
+            item_type_name = type(item).__name__
+            target_type_name = target_type.__name__
+            msg = f"Expected item of type {target_type_name}, got {item_type_name}"
+            raise TypeError(msg)
         return cast(T, item)
