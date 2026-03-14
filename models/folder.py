@@ -84,6 +84,11 @@ class Folder(ItemModel):
             )
             yield from subfolders
         except Exception:
+            logger.warning(
+                "Unable to enumerate subfolders for '%s'",
+                self.name,
+                exc_info=True,
+            )
             return
 
     def walk(
@@ -149,7 +154,7 @@ class Folder(ItemModel):
             created = folders.Add(folder_name)
             return Folder(created)
         except Exception:
-            logger.error(
+            logger.exception(
                 "Error creating subfolder '%s' in '%s'", folder_name, self.name
             )
             return None
@@ -183,7 +188,7 @@ class Folder(ItemModel):
         try:
             self._ol_folder_item.Delete()
         except Exception:
-            logger.error("Error deleting folder '%s'", self.name)
+            logger.exception("Error deleting folder '%s'", self.name)
 
     def __str__(self) -> str:
         """Return string representation of the folder."""

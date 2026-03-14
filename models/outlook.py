@@ -59,7 +59,7 @@ class OutlookApp:
             namespace = connection.GetNamespace("MAPI")
             return cls(connection=connection, namespace=namespace)
         except Exception:
-            logger.error("Error connecting to Outlook")
+            logger.exception("Error connecting to Outlook")
             raise
 
     def _ensure_connection(self) -> None:
@@ -71,7 +71,7 @@ class OutlookApp:
             self._connection = com_client.Dispatch("Outlook.Application")
             self._namespace = self._connection.GetNamespace("MAPI")
         except Exception:
-            logger.error("Error establishing Outlook connection")
+            logger.exception("Error establishing Outlook connection")
             raise
 
     def _establish_user_account(self) -> None:
@@ -94,6 +94,17 @@ class OutlookApp:
 
             self._log_account_not_found(email, accounts)
         except Exception:
+            if self.mailbox_address:
+                logger.warning(
+                    "Unable to resolve Outlook mailbox account for '%s'",
+                    self.mailbox_address,
+                    exc_info=True,
+                )
+            else:
+                logger.warning(
+                    "Unable to inspect Outlook accounts during initialization",
+                    exc_info=True,
+                )
             return
 
     def _find_account_by_email(
@@ -142,7 +153,7 @@ class OutlookApp:
 
             raise ValueError("target_folder must be a string or FolderType enum")
         except Exception:
-            logger.error("Error retrieving folder '%s'", target_folder)
+            logger.exception("Error retrieving folder '%s'", target_folder)
             return None
 
     def get_folder_by_name(self, folder_name: str) -> Folder | None:
@@ -158,7 +169,7 @@ class OutlookApp:
                 raise ValueError("folder_name must be a string")
             return self.mailbox_account.get_folder(folder_name)
         except Exception:
-            logger.error("Error retrieving folder by name '%s'", folder_name)
+            logger.exception("Error retrieving folder by name '%s'", folder_name)
             return None
 
     def get_mailbox_folder(self, mailbox_name: str, folder_name: str) -> Folder | None:
@@ -175,7 +186,7 @@ class OutlookApp:
                 raise ValueError("folder_enum must be an instance of FolderType")
             return self.default_folders.get(folder_enum)
         except Exception:
-            logger.error("Error retrieving default folder '%s'", folder_enum)
+            logger.exception("Error retrieving default folder '%s'", folder_enum)
             return None
 
     def list_mailboxes(self) -> list[Account]:
@@ -184,7 +195,7 @@ class OutlookApp:
             accounts = self._list_accounts()
             return accounts
         except Exception:
-            logger.error("Error listing mailboxes")
+            logger.exception("Error listing mailboxes")
             return []
 
     def get_mailbox(self, mailbox_name: str) -> Account | None:
@@ -204,7 +215,7 @@ class OutlookApp:
                 mail_item.SendUsingAccount = self.mailbox_account._ol_account_item
             return MailItem.from_outlook_item(mail_item)
         except Exception:
-            logger.error("Error creating email")
+            logger.exception("Error creating email")
             return None
 
     def list_emails(self, folder: Folder) -> list[MailItem]:
@@ -255,7 +266,7 @@ class OutlookApp:
             if self._connection is not None:
                 self._connection.Quit()
         except Exception:
-            logger.error("Error closing Outlook connection")
+            logger.exception("Error closing Outlook connection")
         finally:
             self._connection = None
             self._namespace = None

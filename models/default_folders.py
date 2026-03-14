@@ -129,6 +129,8 @@ class DefaultFolders(ItemModel):
         """Return a default folder by name or enum."""
         folder_type = self._resolve_folder_type(folder)
         if folder_type is None:
+            if folder is not None:
+                log.warning("Unknown default folder identifier: %r", folder)
             return None
 
         if folder_type in self._cache:
@@ -140,7 +142,7 @@ class DefaultFolders(ItemModel):
             self._cache[folder_type] = resolved_folder
             return resolved_folder
         except Exception:
-            log.error("Error resolving default folder '%s'", folder_type)
+            log.exception("Error resolving default folder '%s'", folder_type)
             self._cache[folder_type] = None
             return None
 

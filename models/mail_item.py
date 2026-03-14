@@ -299,7 +299,9 @@ class MailItem(ItemModel):
                 f"provided in the 'to', 'cc', or 'bcc' fields."
             )
 
-        self.ol_mail_item.Recipients.ResolveAll()
+        resolved_all = self.ol_mail_item.Recipients.ResolveAll()
+        if resolved_all is False:
+            log.warning("Sending email '%s' with unresolved recipients", self.subject)
 
         if self.table and not (self.body or self.html_body):
             self.body = self.table
@@ -307,22 +309,20 @@ class MailItem(ItemModel):
         try:
             self.display()
             self.ol_mail_item.Send()
-        except Exception as e:
-            log.error(
-                f"Outlook COM Error: Failed to transmit email '{self.subject}'. Details: {e}"
-            )
+        except Exception:
+            log.exception("Failed to send email '%s'", self.subject)
 
     def save(self) -> None:
         try:
             self.ol_mail_item.Save()
-        except Exception as e:
-            log.error(f"Failed to save changes to email '{self.subject}': {e}")
+        except Exception:
+            log.exception("Failed to save email '%s'", self.subject)
 
     def delete(self) -> None:
         try:
             self.ol_mail_item.Delete()
-        except Exception as e:
-            log.error(f"Failed to delete email '{self.subject}': {e}")
+        except Exception:
+            log.exception("Failed to delete email '%s'", self.subject)
 
     def move_to(self, destination: Folder) -> MailItem | None:
 
@@ -334,11 +334,26 @@ class MailItem(ItemModel):
 
         try:
             moved_item = self.ol_mail_item.Move(destination._ol_folder_item)
-            if moved_item and moved_item.Class == ItemType.MAIL_ITEM:
+            if moved_item is None:
+                log.warning(
+                    "Move of email '%s' to folder '%s' returned no item",
+                    self.subject,
+                    destination.name,
+                )
+                return None
+            if moved_item.Class == ItemType.MAIL_ITEM:
                 return MailItem.from_outlook_item(moved_item)
-        except Exception as e:
-            log.error(
-                f"Failed to move email '{self.subject}' to folder '{destination.name}': {e}"
+            log.warning(
+                "Move of email '%s' to folder '%s' returned unexpected item class %r",
+                self.subject,
+                destination.name,
+                getattr(moved_item, "Class", None),
+            )
+        except Exception:
+            log.exception(
+                "Failed to move email '%s' to folder '%s'",
+                self.subject,
+                destination.name,
             )
         return None
 
