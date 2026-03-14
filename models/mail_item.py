@@ -169,12 +169,31 @@ class MailItem(ItemModel):
     def recipients(self) -> list[RecipientInfo]:
         """Returns a list of RecipientInfo dictionaries for all recipients of the email."""
         ol_recipients = self.ol_mail_item.Recipients
-        transformer = AddressEntry
-        entries = unpack_collection(ol_recipients, transformer=transformer)
-        recipient_info = [
-            RecipientInfo(name=entry.name, address=entry.address) for entry in entries
-        ]
-        return recipient_info
+        recipients: list[RecipientInfo] = []
+        for recipient in ol_recipients:
+            name: str | None = None
+            address: str | None = None
+
+            # Try to resolve via the underlying AddressEntry first
+            address_entry = getattr(recipient, "AddressEntry", None)
+            if address_entry is not None:
+                try:
+                    entry = AddressEntry.from_outlook_item(address_entry)
+                except Exception:  # Fallback to Recipient properties if AddressEntry resolution fails
+                    entry = None
+                if entry is not None:
+                    name = entry.name
+                    address = entry.address
+
+            # Fallback: use Recipient.Name / Recipient.Address if needed
+            if name is None:
+                name = getattr(recipient, "Name", "")
+            if address is None:
+                address = getattr(recipient, "Address", "")
+
+            recipients.append(RecipientInfo(name=name, address=address))
+
+        return recipients
 
     # ---- Content ---------------------------------------------------------------
 
