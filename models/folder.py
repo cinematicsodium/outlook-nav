@@ -108,7 +108,7 @@ class Folder(ItemModel):
             subfolders = unpack_collection(self._ol_folder_item.Folders, transformer=Folder)
             yield from subfolders
         except Exception:
-            return []
+            return
 
     def walk(
         self,
