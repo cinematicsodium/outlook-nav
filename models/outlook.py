@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from types import TracebackType
+from typing import cast
 
 from ..enums import FolderType
 from ..exceptions import OutlookConnectionError
@@ -289,10 +290,10 @@ class OutlookApp:
         accounts = unpack_collection(namespace.Accounts, transformer=Account)
         return accounts
 
-    def _ensure_item_type(self, item: object, target_type: type[T]) -> T | None:
+    def _ensure_item_type(self, item: object, target_type: type[T]) -> T:
         """Helper to validate and return an Outlook item of the expected type."""
         if not isinstance(item, target_type):
             item_str = type(item).__name__
             target_str = target_type.__name__
             raise TypeError(f"Expected item of type {target_str}, got {item_str}")
-        return item
+        return cast(T, item)
