@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from enum import IntEnum
-from typing import Any, TYPE_CHECKING, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, TypeVar, cast, overload
 
 if TYPE_CHECKING:
-    from outlook.models.node import ItemModel
+    from .models.node import ItemModel
 
 try:
     import pywintypes  # type: ignore
@@ -127,7 +127,7 @@ def unpack_collection(
         return cast(list[T], [i for i in items if i is not None])
 
     transformed_items = [transformer.from_outlook_item(item) for item in items]
-    return cast(list[ItemModel], [i for i in transformed_items if i is not None])
+    return cast(list[Any], [i for i in transformed_items if i is not None])
 
 
 def is_exchange_user(user: OlAddressEntry) -> bool:
