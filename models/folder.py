@@ -49,11 +49,13 @@ class Folder(ItemModel):
 
     @staticmethod
     def _is_default_folder(item: OlFolder) -> bool:
-        """Check if the folder is a default folder."""
-        try:
-            return bool(FolderType(item.Class))
-        except Exception:
-            return False
+        """Check if the folder is a default Outlook folder.
+
+        This implementation cannot reliably determine default folders from the
+        limited Outlook interop surface exposed here, so it conservatively
+        reports False.
+        """
+        return False
 
     @property
     def name(self) -> str:
@@ -67,11 +69,12 @@ class Folder(ItemModel):
 
     @property
     def folder_type(self) -> FolderType | None:
-        """Return the default-folder enum when this folder maps to one."""
-        try:
-            return FolderType(self._ol_folder_item.Class)
-        except Exception:
-            return None
+        """Return the default-folder enum when this folder maps to one.
+
+        The default-folder identity cannot be derived from the wrapped Outlook
+        item at this layer, so this property always returns None.
+        """
+        return None
 
     @property
     def mail_items(self) -> list[MailItem]:
