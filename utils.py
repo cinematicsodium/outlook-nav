@@ -1,8 +1,9 @@
 from collections.abc import Iterable
 from enum import IntEnum
-from typing import Any, TypeVar, cast, overload
+from typing import Any, TYPE_CHECKING, TypeVar, cast, overload
 
-from outlook.models.node import ItemModel
+if TYPE_CHECKING:
+    from outlook.models.node import ItemModel
 
 try:
     import pywintypes  # type: ignore
