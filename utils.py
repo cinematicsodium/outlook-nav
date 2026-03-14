@@ -127,7 +127,7 @@ def unpack_collection(
         return cast(list[T], [i for i in items if i is not None])
 
     transformed_items = [transformer.from_outlook_item(item) for item in items]
-    return cast(list[Any], [i for i in transformed_items if i is not None])
+    return cast(list[ModelT], [i for i in transformed_items if i is not None])
 
 
 def is_exchange_user(user: OlAddressEntry) -> bool:
