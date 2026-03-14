@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Iterable
 from enum import IntEnum
 from typing import Any, TYPE_CHECKING, TypeVar, cast, overload
