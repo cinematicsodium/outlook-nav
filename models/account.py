@@ -42,15 +42,18 @@ class Account(ItemModel):
         return self.ol_account_item.DeliveryStore
 
     @property
-    def root_folder(self) -> Folder:
-        """Return the root folder of the account's default store."""
+    def root_folder(self) -> Folder | None:
+        """Return the root folder of the account's default store, if available."""
         return Folder.from_outlook_item(self.store.GetRootFolder())
 
     @property
     def folders(self) -> list[Folder]:
         """Return a list of folders in the account's root folder."""
+        root = self.root_folder
+        if root is None:
+            return []
         try:
-            folders = unpack_collection(self.root_folder.Folders, transformer=Folder)
+            folders = unpack_collection(root.outlook_item.Folders, transformer=Folder)
             return folders
         except Exception:
             return []
