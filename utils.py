@@ -1,13 +1,18 @@
 from collections.abc import Iterable
 from enum import IntEnum
-from typing import Any, cast
+from typing import Any, TypeVar, cast, overload
 
-import pywintypes  # type: ignore
+from outlook.models.node import ItemModel
+
+try:
+    import pywintypes  # type: ignore
+except ImportError:  # pragma: no cover - depends on Windows/pywin32
+    pywintypes = None
 
 from .constants import SMTP_ADDRESS_SCHEMA, UNSET
 from .enums import AddressUserType
 from .protocols import OlAddressEntry, OlCollection, OlItem
-from .types import LowerStr, T
+from .type_defs import LowerStr, ModelT, RawT, T
 
 
 def resolve_property(obj: Any, property_name: str, new_value: Any = UNSET) -> T | None:
@@ -51,7 +56,7 @@ def resolve_method(obj: Any, method_name: str, *args: Any, **kwargs: Any) -> T |
         raise
 
 
-def is_interface_error(e: Exception):
+def is_interface_error(e: Exception) -> bool:
     if pywintypes is None:
         return False
     return isinstance(e, pywintypes.com_error)
@@ -86,17 +91,43 @@ def is_ol_item_accessible(
         return False
 
 
-def unpack_collection(collection: OlCollection[T] | None) -> list[T]:
+@overload
+def unpack_collection(
+    collection: OlCollection[T] | None,
+    *,
+    transformer: None = None,
+) -> list[T]: ...
+
+
+@overload
+def unpack_collection(
+    collection: OlCollection[RawT] | None,
+    *,
+    transformer: type[ModelT],
+) -> list[ModelT]: ...
+
+
+def unpack_collection(
+    collection: OlCollection[T] | None,
+    *,
+    transformer: type[ItemModel] | None = None,
+) -> list[T] | list[ItemModel]:
     if collection is None:
         return []
+
     count = collection.Count
     if count == 0:
         return []
+
     items = [collection.Item(i + 1) for i in range(count)]
-    return cast(list[T], [i for i in items if i is not None])
+    if transformer is None:
+        return cast(list[T], [i for i in items if i is not None])
+
+    transformed_items = [transformer.from_outlook_item(item) for item in items]
+    return cast(list[ItemModel], [i for i in transformed_items if i is not None])
 
 
-def is_exchange_user(user: OlAddressEntry):
+def is_exchange_user(user: OlAddressEntry) -> bool:
     rules = [
         user.Type == "EX",
         user.AddressEntryUserType == AddressUserType.EXCHANGE_REMOTE_USER,

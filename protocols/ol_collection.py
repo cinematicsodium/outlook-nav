@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any, Protocol
 
-from ..types import T
+from ..type_defs import T
 from .ol_item import OlItem
 
 

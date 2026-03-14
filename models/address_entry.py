@@ -2,36 +2,34 @@ from __future__ import annotations
 
 from ..enums import ItemType
 from ..protocols import OlAddressEntry
-from ..utils import get_smtp_address, is_accessible_ol_item
+from ..utils import get_smtp_address
+from .node import ItemModel
 
 
-class AddressEntry:
+class AddressEntry(ItemModel):
+    item_type = ItemType.ADDRESS_ENTRY
+    required_properties = (
+        "Address",
+        "Name",
+        "Type",
+        "PropertyAccessor",
+        "AddressEntryUserType",
+    )
+    inaccessible_error_message = (
+        "Provided Outlook item is not an accessible address entry."
+    )
+
     def __init__(self, ol_address_entry: OlAddressEntry):
+        super().__init__(ol_address_entry)
         self.ol_address_entry = ol_address_entry
 
     @classmethod
-    def interface_properties(cls):
-        return (
-            "Address",
-            "Name",
-            "Type",
-            "PropertyAccessor",
-            "AddressEntryUserType",
-        )
+    def interface_properties(cls) -> tuple[str, ...]:
+        return cls.required_properties
 
     @classmethod
     def is_accessible_entry(cls, ol_address_entry: OlAddressEntry) -> bool:
-        return is_accessible_ol_item(
-            ol_address_entry,
-            ItemType.ADDRESS_ENTRY,
-            cls.interface_properties(),
-        )
-
-    @classmethod
-    def from_outlook_item(cls, ol_address_entry: OlAddressEntry) -> AddressEntry | None:
-        if not cls.is_accessible_entry(ol_address_entry):
-            return None
-        return cls(ol_address_entry)
+        return cls.is_accessible(ol_address_entry)
 
     @property
     def name(self) -> str:

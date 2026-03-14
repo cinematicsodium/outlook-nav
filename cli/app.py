@@ -4,10 +4,7 @@ import logging
 
 import typer
 
-from .commands.drafts import drafts_app
-from .commands.folders import folders_app
-from .commands.mailboxes import mailboxes_app
-from .commands.messages import messages_app
+from .commands import drafts, folders, mailboxes, messages
 from .context import CLIState
 
 app = typer.Typer(
@@ -16,10 +13,10 @@ app = typer.Typer(
     add_completion=False,
 )
 
-app.add_typer(mailboxes_app, name="mailboxes")
-app.add_typer(folders_app, name="folders")
-app.add_typer(messages_app, name="messages")
-app.add_typer(drafts_app, name="drafts")
+app.add_typer(mailboxes.app, name="mailboxes")
+app.add_typer(folders.app, name="folders")
+app.add_typer(messages.app, name="messages")
+app.add_typer(drafts.app, name="drafts")
 
 
 def _configure_logging(verbose: bool) -> None:

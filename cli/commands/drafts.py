@@ -6,13 +6,13 @@ import typer
 
 from ..context import abort, create_client
 
-drafts_app = typer.Typer(
+app = typer.Typer(
     help="Create Outlook draft messages from the command line.",
     no_args_is_help=True,
 )
 
 
-@drafts_app.command("create")
+@app.command("create")
 def create_draft(
     ctx: typer.Context,
     to: str = typer.Option(

@@ -6,7 +6,7 @@ from typing import Any, Callable, TypeVar, overload
 
 from .constants import DIGIT_REGEX, EMAIL_REGEX, TIMEZONE_OFFSET
 from .exceptions import EmailValidationError, PathValidationError
-from .types import LowerStr
+from .type_defs import LowerStr
 
 T = TypeVar("T")
 U = TypeVar("U")

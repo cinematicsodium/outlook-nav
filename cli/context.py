@@ -71,11 +71,7 @@ def resolve_account(
 
     if selected_mailbox:
         if client.mailbox_account is not None:
-            names = {
-                client.mailbox_account.name.lower(),
-                client.mailbox_account.address.lower(),
-            }
-            if selected_mailbox.lower() in names:
+            if client.mailbox_account.matches(selected_mailbox):
                 return client.mailbox_account
 
         account = client.get_mailbox(selected_mailbox)

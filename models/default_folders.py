@@ -12,6 +12,21 @@ from ..utils import is_accessible_ol_item
 class DefaultFolders:
     """Manages Outlook default folders."""
 
+    _NAME_MAP: dict[str, FolderType] = {
+        "deleted_items": FolderType.DELETED_ITEMS,
+        "outbox": FolderType.OUTBOX,
+        "sent_mail": FolderType.SENT_MAIL,
+        "inbox": FolderType.INBOX,
+        "calendar": FolderType.CALENDAR,
+        "contacts": FolderType.CONTACTS,
+        "journal": FolderType.JOURNAL,
+        "notes": FolderType.NOTES,
+        "conflicts": FolderType.CONFLICTS,
+        "local_failures": FolderType.LOCAL_FAILURES,
+        "junk": FolderType.JUNK,
+        "drafts": FolderType.DRAFTS,
+    }
+
     def __init__(self, namespace: OlNamespace):
         """Initialize with Outlook namespace."""
         self._namespace = namespace
@@ -21,7 +36,7 @@ class DefaultFolders:
             raise ValueError("Provided namespace is not accessible or valid.")
 
     @classmethod
-    def from_namespace(cls, namespace: OlNamespace) -> DefaultFolders:
+    def from_namespace(cls, namespace: OlNamespace) -> DefaultFolders | None:
         if not cls.is_accessible_namespace(namespace):
             return None
         return cls(namespace)
@@ -36,80 +51,67 @@ class DefaultFolders:
     @staticmethod
     def folder_name_map() -> dict[str, FolderType]:
         """Return mapping of folder names to enums."""
-        return {
-            "deleted_items": FolderType.DELETED_ITEMS,
-            "outbox": FolderType.OUTBOX,
-            "sent_mail": FolderType.SENT_MAIL,
-            "inbox": FolderType.INBOX,
-            "calendar": FolderType.CALENDAR,
-            "contacts": FolderType.CONTACTS,
-            "journal": FolderType.JOURNAL,
-            "notes": FolderType.NOTES,
-            "conflicts": FolderType.CONFLICTS,
-            "local_failures": FolderType.LOCAL_FAILURES,
-            "junk": FolderType.JUNK,
-            "drafts": FolderType.DRAFTS,
-        }
+        return dict(DefaultFolders._NAME_MAP)
 
     @property
     def deleted_items(self) -> Folder | None:
         """Return Deleted Items folder."""
-        return self._get_default_folder("deleted_items")
+        return self.get("deleted_items")
 
     @property
     def outbox(self) -> Folder | None:
         """Return Outbox folder."""
-        return self._get_default_folder("outbox")
+        return self.get("outbox")
 
     @property
     def sent_mail(self) -> Folder | None:
         """Return Sent Mail folder."""
-        return self._get_default_folder("sent_mail")
+        return self.get("sent_mail")
 
     @property
     def inbox(self) -> Folder | None:
         """Return Inbox folder."""
-        return self._get_default_folder("inbox")
+        return self.get("inbox")
 
     @property
     def calendar(self) -> Folder | None:
         """Return Calendar folder."""
-        return self._get_default_folder("calendar")
+        return self.get("calendar")
 
     @property
     def contacts(self) -> Folder | None:
         """Return Contacts folder."""
-        return self._get_default_folder("contacts")
+        return self.get("contacts")
 
     @property
     def journal(self) -> Folder | None:
         """Return Journal folder."""
-        return self._get_default_folder("journal")
+        return self.get("journal")
 
     @property
     def notes(self) -> Folder | None:
         """Return Notes folder."""
-        return self._get_default_folder("notes")
+        return self.get("notes")
 
     @property
     def conflicts(self) -> Folder | None:
         """Return Conflicts folder."""
-        return self._get_default_folder("conflicts")
+        return self.get("conflicts")
 
     @property
     def local_failures(self) -> Folder | None:
         """Return Local Failures folder."""
-        return self._get_default_folder("local_failures")
+        return self.get("local_failures")
 
     @property
     def junk(self) -> Folder | None:
         """Return Junk folder."""
-        return self._get_default_folder("junk")
+        return self.get("junk")
 
     @property
     def drafts(self) -> Folder | None:
         """Return Drafts folder."""
-        return self._get_default_folder("drafts")
+        return self.get("drafts")
 
     @property
     def all(self) -> list[Folder]:
@@ -119,7 +121,7 @@ class DefaultFolders:
     def _to_dict(self) -> dict[str, Folder]:
         """Return dictionary of default folders."""
         data: dict[str, Folder | None] = {
-            name: self._get_default_folder(name) for name in self.folder_name_map()
+            name: self.get(name) for name in self.folder_name_map()
         }
         return {k: v for k, v in data.items() if v is not None}
 
@@ -135,26 +137,35 @@ class DefaultFolders:
         """Return default folders as a list."""
         return self._to_list()
 
-    def _get_default_folder(self, folder_name: str) -> Folder | None:
-        """Return default folder by name."""
-        mapping = self.folder_name_map()
-
-        if not folder_name or folder_name not in mapping:
+    def get(self, folder: str | FolderType) -> Folder | None:
+        """Return a default folder by name or enum."""
+        folder_type = self._resolve_folder_type(folder)
+        if folder_type is None:
             return None
 
-        if folder_name in self._cache:
-            return self._cache[folder_name]
+        if folder_type in self._cache:
+            return self._cache[folder_type]
 
-        target = mapping[folder_name]
         try:
-            ol_folder = self._namespace.GetDefaultFolder(target)
-            folder = Folder(ol_folder)
-            self._cache[target] = folder
-            return folder
+            ol_folder = self._namespace.GetDefaultFolder(folder_type)
+            resolved_folder = Folder(ol_folder)
+            self._cache[folder_type] = resolved_folder
+            return resolved_folder
         except Exception:
-            log.error("Error resolving default folder '%s'", target)
-            self._cache[target] = None
+            log.error("Error resolving default folder '%s'", folder_type)
+            self._cache[folder_type] = None
             return None
+
+    def _get_default_folder(self, folder: str | FolderType) -> Folder | None:
+        """Backward-compatible wrapper for retrieving a default folder."""
+        return self.get(folder)
+
+    def _resolve_folder_type(self, folder: str | FolderType) -> FolderType | None:
+        if isinstance(folder, FolderType):
+            return folder
+        if not folder:
+            return None
+        return self.folder_name_map().get(folder)
 
     def __iter__(self) -> Iterator[Folder]:
         """Iterate over default folders."""

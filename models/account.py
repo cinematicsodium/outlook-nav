@@ -3,29 +3,28 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from ..enums import ItemType
-from ..models.folder import Folder
-from ..protocols import OlAccount, OlFolder, OlStore
-from ..utils import is_accessible_ol_item, unpack_collection
+from ..protocols import OlAccount, OlStore
+from ..utils import unpack_collection
+from .folder import Folder
+from .node import ItemModel
 
 
-class Account:
+class Account(ItemModel):
     """Represents an Outlook account."""
+
+    item_type = ItemType.ACCOUNT
+    required_properties = ("DisplayName", "SmtpAddress", "DeliveryStore")
+    inaccessible_error_message = "Provided Outlook item is not an accessible account."
 
     def __init__(self, ol_acct_item: OlAccount) -> None:
         """Initialize Account with an Outlook account item."""
+        super().__init__(ol_acct_item)
         self.ol_account_item: OlAccount = ol_acct_item
 
     @classmethod
     def is_accessible_acct(cls, item: OlAccount) -> bool:
         """Check if the given item is an accessible Outlook account."""
-        return is_accessible_ol_item(item=item, target_type=ItemType.ACCOUNT)
-
-    @classmethod
-    def from_outlook_item(cls, ol_acct_item: OlAccount) -> Account | None:
-        """Create Account from an Outlook account item."""
-        if not cls.is_accessible_acct(ol_acct_item):
-            return None
-        return cls(ol_acct_item)
+        return cls.is_accessible(item)
 
     @property
     def name(self) -> str:
@@ -43,23 +42,16 @@ class Account:
         return self.ol_account_item.DeliveryStore
 
     @property
-    def root_folder(self) -> OlFolder:
+    def root_folder(self) -> Folder:
         """Return the root folder of the account's default store."""
-        return self.store.GetRootFolder()
+        return Folder.from_outlook_item(self.store.GetRootFolder())
 
     @property
     def folders(self) -> list[Folder]:
         """Return a list of folders in the account's root folder."""
         try:
-            ol_folder_items: list[OlFolder] = unpack_collection(
-                self.root_folder.Folders
-            )
-            if not ol_folder_items:
-                return []
-            folders: list[Folder | None] = [
-                Folder.from_outlook_item(ol_folder) for ol_folder in ol_folder_items
-            ]
-            return [f for f in folders if f]
+            folders = unpack_collection(self.root_folder.Folders, transformer=Folder)
+            return folders
         except Exception:
             return []
 
@@ -93,6 +85,13 @@ class Account:
                 return None
             current = current.get_subfolder(segment)
         return current
+
+    def matches(self, value: str | None) -> bool:
+        """Return True when the value matches the account name or address."""
+        if not value:
+            return False
+        target = value.lower()
+        return target in {self.name.lower(), self.address.lower()}
 
     def __str__(self) -> str:
         """Return the display name of the account."""
