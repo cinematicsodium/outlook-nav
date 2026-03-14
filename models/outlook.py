@@ -118,7 +118,11 @@ class OutlookApp:
         """Return DefaultFolders instance for Outlook's default folders."""
         if self._default_folders is None:
             namespace = self._require_namespace()
-            self._default_folders = DefaultFolders.from_namespace(namespace)
+            default_folders = DefaultFolders.from_namespace(namespace)
+            if default_folders is None:
+                logger.error("Unable to initialize default Outlook folders from namespace")
+                raise OutlookConnectionError("Unable to initialize default Outlook folders.")
+            self._default_folders = default_folders
         return self._default_folders
 
     def get_folder(self, target_folder: str | FolderType) -> Folder | None:
