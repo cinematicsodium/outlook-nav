@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ..types import T
+from ..type_defs import T
 from .ol_item import OlItem
 
 if TYPE_CHECKING:

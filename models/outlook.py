@@ -9,7 +9,8 @@ from ..models.account import Account
 from ..models.default_folders import DefaultFolders
 from ..models.folder import Folder
 from ..models.mail_item import MailItem
-from ..protocols import OlApplication, OlDispatch, OlMailItem, OlNamespace
+from ..protocols import OlApplication, OlCollection, OlDispatch, OlMailItem, OlNamespace
+from ..type_defs import T
 from ..utils import unpack_collection
 from ..validation import validate_email
 
@@ -19,9 +20,9 @@ logger = logging.getLogger(__name__)
 def _load_win32_client() -> OlDispatch:
     """Lazily import pywin32 to avoid import-time crashes on non-Windows systems."""
     try:
-        import win32com.client as com_client  # type: ignore
+        from win32com import client  # type: ignore
 
-        return com_client
+        return client
     except ImportError as exc:
         raise OutlookConnectionError(
             "win32com.client is required to use OutlookApp. Install pywin32 on Windows."
@@ -75,44 +76,53 @@ class OutlookApp:
     def _establish_user_account(self) -> None:
         """Set up the mailbox account based on the email address."""
         try:
-            ol_accounts = unpack_collection(self._namespace.Accounts)
-            accounts = [Account.from_outlook_item(account) for account in ol_accounts]
-            valid_accts = [acct for acct in accounts if acct and acct]
+            accounts = self._list_accounts()
             if len(accounts) == 1:
-                self.mailbox_account = Account.from_outlook_item(accounts[0])
+                self.mailbox_account = accounts[0]
                 return
 
             email = self.mailbox_address
-
             if not email:
                 return
 
-            addresses: list[str] = []
+            matched_account = self._find_account_by_email(accounts, email)
+            if matched_account:
+                self.mailbox_account = matched_account
+                logger.info(f"Successfully set default account to: {email}")
+                return
 
-            for account in accounts:
-                acct_address = account.SmtpAddress.lower()
-                addresses.append(acct_address)
-
-                if acct_address == email:
-                    self.mailbox_account = Account.from_outlook_item(account)
-                    logger.info(f"Successfully set default account to: {email}")
-                    return
-
-            logger.warning(f"Account {email} not found. Available accounts are:")
-            logger.warning("\n".join(f"- {address}" for address in addresses))
-
+            self._log_account_not_found(email, accounts)
         except Exception:
             return
+
+    def _find_account_by_email(
+        self, accounts: list[Account], email: str
+    ) -> Account | None:
+        """Find an account matching the given email address."""
+        email_lower = email.lower()
+        for account in accounts:
+            if account.matches(email_lower):
+                return account
+        return None
+
+    def _log_account_not_found(self, email: str, accounts: list[Account]) -> None:
+        """Log a warning if the account is not found."""
+        addresses = [account.address.lower() for account in accounts]
+        msg = f"Account '{email}' not found among {len(accounts)} accounts. "
+        msg += "Available accounts:\n"
+        msg += "\n".join(f"- {address}" for address in addresses)
+        logger.warning(msg)
 
     @property
     def default_folders(self) -> DefaultFolders:
         """Return DefaultFolders instance for Outlook's default folders."""
         if self._default_folders is None:
-            self._default_folders = DefaultFolders(self._require_namespace())
+            namespace = self._require_namespace()
+            self._default_folders = DefaultFolders.from_namespace(namespace)
         return self._default_folders
 
     def get_folder(self, target_folder: str | FolderType) -> Folder | None:
-        """Get a folder by name or default folder enum."""
+        """Get a folder by name or default folder type identifier."""
         try:
             if isinstance(target_folder, str):
                 return self.get_folder_by_name(target_folder)
@@ -120,7 +130,7 @@ class OutlookApp:
             if isinstance(target_folder, FolderType):
                 return self.get_default_folder(target_folder)
 
-            raise ValueError("target_folder must be a string or FolderEnum")
+            raise ValueError("target_folder must be a string or FolderType enum")
         except Exception:
             logger.error("Error retrieving folder '%s'", target_folder)
             return None
@@ -136,11 +146,7 @@ class OutlookApp:
                 return
             if not isinstance(folder_name, str):
                 raise ValueError("folder_name must be a string")
-
-            for folder in self.mailbox_account.folders:
-                if str(folder.name).lower() == folder_name.lower():
-                    return folder
-            return None
+            return self.mailbox_account.get_folder(folder_name)
         except Exception:
             logger.error("Error retrieving folder by name '%s'", folder_name)
             return None
@@ -156,38 +162,34 @@ class OutlookApp:
         """Get a default folder by enum."""
         try:
             if not isinstance(folder_enum, FolderType):
-                raise ValueError("folder_enum must be an instance of FolderEnum")
-            return self.default_folders._get_default_folder(folder_enum)
+                raise ValueError("folder_enum must be an instance of FolderType")
+            return self.default_folders.get(folder_enum)
         except Exception:
             logger.error("Error retrieving default folder '%s'", folder_enum)
             return None
 
     def list_mailboxes(self) -> list[Account]:
         """List all mailboxes/accounts."""
-        accounts: list[Account] = []
         try:
-            for mailbox in self._require_namespace().Folders:
-                account = Account.from_outlook_item(mailbox)
-                if account:
-                    accounts.append(account)
+            accounts = self._list_accounts()
+            return accounts
         except Exception:
             logger.error("Error listing mailboxes")
-        return accounts
+            return []
 
     def get_mailbox(self, mailbox_name: str) -> Account | None:
         """Get an account/mailbox by name."""
-        if not isinstance(mailbox_name, str):
-            raise ValueError("mailbox_name must be a string")
-        target = mailbox_name.lower()
+        mailbox_name = self._ensure_item_type(mailbox_name, str)
         for mailbox in self.list_mailboxes():
-            if mailbox.name.lower() == target:
+            if mailbox.matches(mailbox_name):
                 return mailbox
         return None
 
     def create_email(self) -> MailItem | None:
         """Create a new email item."""
         try:
-            mail_item: OlMailItem = self._require_connection().CreateItem(0)
+            connection = self._require_connection()
+            mail_item: OlMailItem = connection.CreateItem(0)
             if self.mailbox_account:
                 mail_item.SendUsingAccount = self.mailbox_account.ol_account_item
             return MailItem.from_outlook_item(mail_item)
@@ -197,50 +199,44 @@ class OutlookApp:
 
     def list_emails(self, folder: Folder) -> list[MailItem]:
         """List emails in a folder."""
-        if not isinstance(folder, Folder):
-            raise ValueError("folder must be a Folder")
-
-        items = folder.mail_items
-        if isinstance(items, list):
-            return items
-        return []
+        folder = self._ensure_item_type(folder, Folder)
+        return folder.list_messages()
 
     def move_email(self, mail_item: MailItem, destination: Folder) -> MailItem | None:
         """Move an email to another folder."""
-        if not isinstance(mail_item, MailItem):
-            raise ValueError("mail_item must be a MailItem")
+        mail_item = self._ensure_item_type(mail_item, MailItem)
+        destination = self._ensure_item_type(destination, Folder)
         return mail_item.move_to(destination)
 
     def send_email(self, mail_item: MailItem) -> None:
         """Send an email item."""
-        if not isinstance(mail_item, MailItem):
-            raise ValueError("mail_item must be a MailItem")
+        mail_item = self._ensure_item_type(mail_item, MailItem)
         mail_item.send()
 
     def delete_email(self, mail_item: MailItem) -> None:
         """Delete an email item."""
-        if not isinstance(mail_item, MailItem):
-            raise ValueError("mail_item must be a MailItem")
+        mail_item = self._ensure_item_type(mail_item, MailItem)
         mail_item.delete()
 
     def create_folder(self, parent: Folder, folder_name: str) -> Folder | None:
         """Create a subfolder under a parent folder."""
-        if not isinstance(parent, Folder):
-            raise ValueError("parent must be a Folder")
+        parent = self._ensure_item_type(parent, Folder)
+        folder_name = self._ensure_item_type(folder_name, str)
+
         return parent.create_subfolder(folder_name)
 
     def delete_folder(self, folder: Folder) -> None:
         """Delete a folder."""
-        if not isinstance(folder, Folder):
-            raise ValueError("folder must be a Folder")
+        folder = self._ensure_item_type(folder, Folder)
         folder.delete()
 
-    def move_folder_item(
+    def move_folder(
         self, source: Folder, mail_item: MailItem, destination: Folder
     ) -> MailItem | None:
         """Move a mail item from one folder to another."""
-        if not isinstance(source, Folder):
-            raise ValueError("source must be a Folder")
+        source = self._ensure_item_type(source, Folder)
+        mail_item = self._ensure_item_type(mail_item, MailItem)
+        destination = self._ensure_item_type(destination, Folder)
         return source.move_item(mail_item, destination)
 
     def close(self) -> None:
@@ -283,3 +279,16 @@ class OutlookApp:
                 "Outlook namespace is not available. Call connect() first."
             )
         return self._namespace
+
+    def _list_accounts(self, namespace: OlNamespace | None = None) -> list[Account]:
+        namespace = namespace or self._require_namespace()
+        accounts = unpack_collection(namespace.Accounts, transformer=Account)
+        return accounts
+
+    def _ensure_item_type(self, item: object, target_type: type[T]) -> T | None:
+        """Helper to validate and return an Outlook item of the expected type."""
+        if not isinstance(item, target_type):
+            item_str = type(item).__name__
+            target_str = target_type.__name__
+            raise TypeError(f"Expected item of type {target_str}, got {item_str}")
+        return item

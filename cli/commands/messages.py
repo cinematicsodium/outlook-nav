@@ -2,36 +2,16 @@ from __future__ import annotations
 
 import typer
 
-from ...models.folder import Folder
-from ...models.mail_item import MailItem
 from ..context import create_client, resolve_folder
 from ..rendering import echo_table, format_datetime, truncate
 
-messages_app = typer.Typer(
+app = typer.Typer(
     help="Inspect messages in an Outlook folder.",
     no_args_is_help=True,
 )
 
 
-def _load_messages(folder: Folder, limit: int, unread_only: bool) -> list[MailItem]:
-    items = folder._ol_folder_item.Items
-    total_items = getattr(items, "Count", 0)
-    messages: list[MailItem] = []
-
-    for index in range(1, total_items + 1):
-        message = MailItem.from_outlook_item(items.Item(index))
-        if message is None:
-            continue
-        if unread_only and not message.is_unread:
-            continue
-        messages.append(message)
-        if len(messages) >= limit:
-            break
-
-    return messages
-
-
-@messages_app.command("list")
+@app.command("list")
 def list_messages(
     ctx: typer.Context,
     folder_path: str = typer.Argument(
@@ -65,7 +45,7 @@ def list_messages(
     """List recent messages from a folder."""
     client = create_client(ctx)
     folder = resolve_folder(client, ctx, folder_path, mailbox=mailbox)
-    messages = _load_messages(folder, limit=limit, unread_only=unread_only)
+    messages = folder.list_messages(limit=limit, unread_only=unread_only)
 
     rows: list[tuple[object, ...]] = []
     for message in messages:

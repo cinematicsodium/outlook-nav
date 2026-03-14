@@ -10,16 +10,12 @@ from tabulate import tabulate
 from ..enums import ItemType
 from ..logger import log
 from ..protocols import OlMailItem
-from ..utils import (
-    get_smtp_address,
-    is_accessible_ol_item,
-    resolve_property,
-    unpack_collection,
-)
+from ..utils import get_smtp_address, resolve_property, unpack_collection
 from ..validation import validate_datetime, validate_email, validate_paths
+from .address_entry import AddressEntry
+from .node import ItemModel
 
 if TYPE_CHECKING:
-    from .address_entry import AddressEntry
     from .folder import Folder
 
 
@@ -46,44 +42,37 @@ class MailItemData(TypedDict):
     size: int
 
 
-class MailItem:
+class MailItem(ItemModel):
+    item_type = ItemType.MAIL_ITEM
+    required_properties = (
+        "SenderEmailAddress",
+        "SentOnBehalfOfName",
+        "To",
+        "CC",
+        "BCC",
+        "Subject",
+        "Body",
+        "HTMLBody",
+        "Attachments",
+        "DeferredDeliveryTime",
+        "SentOn",
+        "ReceivedTime",
+        "ConversationID",
+    )
+    inaccessible_error_message = "Provided Outlook item is not an accessible mail item."
+
     def __init__(self, item: Any):
+        super().__init__(item)
         self.ol_mail_item: OlMailItem = item
         self._message_table: Any = None
-        if not self.is_accessible_mail_item(item):
-            raise ValueError("Provided Outlook item is not an accessible mail item.")
-
-    @classmethod
-    def from_outlook_item(cls, item: Any) -> MailItem | None:
-        if not cls.is_accessible_mail_item(item):
-            return None
-        return cls(item)
 
     @classmethod
     def is_accessible_mail_item(cls, item: Any) -> bool:
-        return is_accessible_ol_item(
-            item=item,
-            target_type=ItemType.MAIL_ITEM,
-            properties=cls.interface_properties(),
-        )
+        return cls.is_accessible(item)
 
     @classmethod
     def interface_properties(cls) -> tuple[str, ...]:
-        return (
-            "SenderEmailAddress",
-            "SentOnBehalfOfName",
-            "To",
-            "CC",
-            "BCC",
-            "Subject",
-            "Body",
-            "HTMLBody",
-            "Attachments",
-            "DeferredDeliveryTime",
-            "SentOn",
-            "ReceivedTime",
-            "ConversationID",
-        )
+        return cls.required_properties
 
     # ---- Identity / Threading -------------------------------------------------
 
@@ -115,6 +104,8 @@ class MailItem:
     @property
     def parent_folder(self) -> Folder | None:
         """Returns the Folder containing the mail item."""
+        from .folder import Folder
+
         return Folder.from_outlook_item(self.ol_mail_item.Parent)
 
     # ---- Sender / Recipients --------------------------------------------------
@@ -177,22 +168,13 @@ class MailItem:
     @property
     def recipients(self) -> list[RecipientInfo]:
         """Returns a list of RecipientInfo dictionaries for all recipients of the email."""
-        ol_recipients = unpack_collection(self.ol_mail_item.Recipients)
-        if not ol_recipients:
-            return []
-
-        recipients: list[RecipientInfo] = []
-        for recipient in ol_recipients:
-            address_entry = AddressEntry.from_outlook_item(recipient.AddressEntry)
-            if address_entry:
-                name = address_entry.name
-                address = address_entry.address
-            else:
-                name = recipient.Name
-                address = recipient.Address
-
-            recipients.append(RecipientInfo(name=name, address=address))
-        return recipients
+        ol_recipients = self.ol_mail_item.Recipients
+        transformer = AddressEntry
+        entries = unpack_collection(ol_recipients, transformer=transformer)
+        recipient_info = [
+            RecipientInfo(name=entry.name, address=entry.address) for entry in entries
+        ]
+        return recipient_info
 
     # ---- Content ---------------------------------------------------------------
 
@@ -246,7 +228,7 @@ class MailItem:
         """Gets a list of filenames for all current attachments."""
         ol_attachments = unpack_collection(self.ol_mail_item.Attachments)
         attachment_names = [
-            str(att.FileName) for att in ol_attachments if att and att.FileName
+            str(att.FileName) for att in ol_attachments if att is not None
         ]
         return attachment_names
 
@@ -360,7 +342,7 @@ class MailItem:
             )
 
         try:
-            moved_item = self.ol_mail_item.Move(destination._ol_folder_item)
+            moved_item = self.ol_mail_item.Move(destination.outlook_item)
             if moved_item and moved_item.Class == ItemType.MAIL_ITEM:
                 return MailItem.from_outlook_item(moved_item)
         except Exception as e:
@@ -369,7 +351,7 @@ class MailItem:
             )
         return None
 
-    def update(self, **fields: Any) -> None:
+    def update(self, **kwargs: Any) -> None:
         allowed_fields = {
             "to",
             "cc",
@@ -382,11 +364,11 @@ class MailItem:
             "scheduled_delivery_time",
             "is_unread",
         }
-        invalid = sorted(set(fields) - allowed_fields)
+        invalid = sorted(set(kwargs) - allowed_fields)
         if invalid:
             raise ValueError(f"Unsupported update fields: {', '.join(invalid)}")
 
-        for key, value in fields.items():
+        for key, value in kwargs.items():
             setattr(self, key, value)
 
         self.save()
@@ -423,8 +405,7 @@ class MailItem:
         return self._to_dict()
 
     def _to_table(self) -> str:
-        body = self.body or self.html_body or ""
-        fmtd_body = self._fmt_body(body)
+        fmtd_body = self._fmt_body(self.body or self.html_body or "")
 
         attachments = f"{len(self.attachments)} files(s)"
         parent_folder = self.parent_folder.name if self.parent_folder else ""

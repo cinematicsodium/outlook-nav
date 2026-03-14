@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..enums import ItemType
-from ..types import T
+from ..type_defs import T
 from .ol_item import OlItem
 from .ol_namespace import OlNamespace
 

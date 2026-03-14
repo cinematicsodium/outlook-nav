@@ -5,43 +5,47 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 
 from ..enums import FolderType, ItemType
-from ..models.mail_item import MailItem
 from ..protocols import OlFolder
-from ..utils import is_accessible_ol_item
+from ..utils import unpack_collection
+from .node import ItemModel
+from .mail_item import MailItem
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class Folder:
+@dataclass(frozen=True, slots=True)
+class FolderListing:
+    """Serializable folder tree entry for CLI and reporting."""
+
+    path: str
+    depth: int
+    subfolder_count: int
+
+    def as_row(self) -> tuple[object, ...]:
+        return (self.path, self.depth, self.subfolder_count)
+
+
+class Folder(ItemModel):
     """Represents an Outlook folder."""
+
+    item_type = ItemType.FOLDER
+    required_properties = ("Name", "Items", "Folders")
+    inaccessible_error_message = "Provided Outlook item is not an accessible folder."
 
     def __init__(self, outlook_item: OlFolder) -> None:
         """Initialize Folder with an Outlook item."""
+        super().__init__(outlook_item)
         self._ol_folder_item: OlFolder = outlook_item
-        if not self.is_folder_accessible(outlook_item):
-            raise ValueError("Provided Outlook item is not an accessible folder.")
-
-    @classmethod
-    def from_outlook_item(cls, item: object) -> Folder | None:
-        """Create Folder from an Outlook item if accessible."""
-        if not cls.is_folder_accessible(item):
-            return None
-        return cls(item)
 
     @classmethod
     def is_folder_accessible(cls, item: object) -> bool:
         """Check if the Outlook folder item is accessible."""
-        return is_accessible_ol_item(
-            item=item,
-            target_type=ItemType.FOLDER,
-            properties=cls.interface_properties(),
-        )
+        return cls.is_accessible(item)
 
     @classmethod
     def interface_properties(cls) -> tuple[str, str, str]:
         """Return interface properties for Outlook folder."""
-        return ("Name", "Items", "Folders")
+        return cls.required_properties
 
     @staticmethod
     def _is_default_folder(item: OlFolder) -> bool:
@@ -57,47 +61,83 @@ class Folder:
         return self._ol_folder_item.Name
 
     @property
+    def outlook_item(self) -> OlFolder:
+        """Expose the wrapped Outlook folder for internal integrations."""
+        return self._ol_folder_item
+
+    @property
+    def folder_type(self) -> FolderType | None:
+        """Return the default-folder enum when this folder maps to one."""
+        try:
+            return FolderType(self._ol_folder_item.Class)
+        except Exception:
+            return None
+
+    @property
     def mail_items(self) -> list[MailItem]:
         """Return a list of MailItem objects in the folder."""
-        folder_items = self._ol_folder_item.Items
-        item_count: int = folder_items.Count
-
-        if not (folder_items and item_count):
-            return []
-
-        outlook_items: list[object] = [
-            folder_items.Item(idx) for idx in range(1, item_count + 1)
-        ]
-        mail_items: list[MailItem | None] = [
-            MailItem.from_outlook_item(item) for item in outlook_items
-        ]
-        valid_items: list[MailItem] = [item for item in mail_items if item]
-        return valid_items
+        return self.list_messages()
 
     @property
     def subfolders(self) -> list[Folder]:
         """Return a list of subfolders."""
+        return list(self.iter_subfolders())
+
+    def list_messages(
+        self,
+        limit: int | None = None,
+        unread_only: bool = False,
+    ) -> list[MailItem]:
+        """Return mail items from this folder with optional filtering."""
+        if limit is not None and limit < 1:
+            raise ValueError("limit must be >= 1")
+
+        mail_items = unpack_collection(self._ol_folder_item.Items, transformer=MailItem)
+
+        if unread_only:
+            mail_items = [item for item in mail_items if item.is_unread]
+
+        if limit is not None:
+            mail_items = mail_items[:limit]
+
+        return mail_items
+
+    def iter_subfolders(self) -> Iterable[Folder]:
+        """Iterate over accessible child folders."""
         try:
-            folders = self._ol_folder_item.Folders
-            count: int = folders.Count
-
-            if not (folders and count):
-                return []
-
-            outlook_items: list[object] = [
-                folders.Item(idx) for idx in range(1, count + 1)
-            ]
-
-            folder_items: list[Folder | None] = [
-                Folder.from_outlook_item(folder)
-                for folder in outlook_items
-                if folder.Class == ItemType.FOLDER
-            ]
-
-            return [folder for folder in folder_items if folder]
-
+            subfolders = unpack_collection(self._ol_folder_item.Folders, transformer=Folder)
+            yield from subfolders
         except Exception:
             return []
+
+    def walk(
+        self,
+        recursive: bool = False,
+        max_depth: int = 0,
+        depth: int = 0,
+        parent_path: str = "",
+    ) -> list[FolderListing]:
+        """Return folder tree entries rooted at this folder."""
+        if recursive and max_depth < 0:
+            raise ValueError("max_depth must be >= 0")
+
+        path = f"{parent_path}/{self.name}" if parent_path else self.name
+        subfolders = self.subfolders
+        rows = [FolderListing(path=path, depth=depth, subfolder_count=len(subfolders))]
+
+        if not recursive or depth >= max_depth:
+            return rows
+
+        for child in subfolders:
+            rows.extend(
+                child.walk(
+                    recursive=recursive,
+                    max_depth=max_depth,
+                    depth=depth + 1,
+                    parent_path=path,
+                )
+            )
+        return rows
 
     def get_item(self, index: int) -> MailItem | None:
         """Get MailItem at the specified index."""
