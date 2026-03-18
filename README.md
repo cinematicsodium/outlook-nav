@@ -6,11 +6,12 @@ This package is intended for environments where the Outlook desktop app is avail
 
 ## What the module provides
 
-- `OutlookApp`: connect to Outlook, resolve mailboxes, create messages, and work with folders.
+- `OutlookApp`: connect to Outlook, resolve mailboxes, create messages, and work with folders. Supports context manager usage for automatic resource cleanup.
 - `Account`: inspect mailbox/account metadata and walk mailbox folder trees.
-- `Folder`: list messages, browse subfolders, create folders, and move items.
-- `MailItem`: read message fields, update drafts, attach files, save, display, send, move, or delete messages.
-- `DefaultFolders`: convenient access to common folders like Inbox, Drafts, Sent Mail, and Junk.
+- `Folder`: list messages (with optional limit and unread-only filters), browse and walk the subfolder tree, create or delete subfolders, and move or delete items.
+- `MailItem`: read and set message fields (including HTML body and unread flag), update multiple fields at once, attach files, save, display, send, move, or delete messages.
+- `DefaultFolders`: convenient access to default folders including Inbox, Drafts, Sent Mail, Junk, Deleted Items, Outbox, Calendar, Contacts, Journal, Notes, Conflicts, and Local Failures.
+- Exception classes: `OutlookError`, `OutlookConnectionError`, `OutlookValidationError`, `EmailValidationError`, and `PathValidationError` for structured error handling.
 
 ## Requirements
 
@@ -38,6 +39,19 @@ app = OutlookApp(mailbox_address="me@company.com")
 print(app.mailbox_account)
 ```
 
+You can also use the `connect()` classmethod, or manage the connection with a context manager so COM resources are released automatically:
+
+```python
+from outlook import OutlookApp
+
+# classmethod — equivalent to OutlookApp() without a mailbox address
+app = OutlookApp.connect()
+
+# context manager — calls app.close() on exit
+with OutlookApp(mailbox_address="me@company.com") as app:
+    print(app.list_mailboxes())
+```
+
 ### Read messages from the Inbox
 
 ```python
@@ -47,8 +61,12 @@ app = OutlookApp()
 inbox = app.default_folders.inbox
 
 if inbox:
-    for message in inbox.mail_items[:10]:
+    for message in inbox.list_messages(limit=10):
         print(message.received_time, message.sender_address, message.subject)
+
+    # show only unread messages
+    for message in inbox.list_messages(unread_only=True):
+        print(message.subject, message.is_unread)
 ```
 
 ### Find a folder by path inside a mailbox
@@ -75,10 +93,26 @@ message = app.create_email()
 if message:
     message.to = ["alice@company.com", "bob@company.com"]
     message.cc = "manager@company.com"
+    message.bcc = "archive@company.com"
     message.subject = "Weekly status"
     message.body = "Attached is the latest update."
     message.add_attachments("~/Documents/status.xlsx")
     message.save()
+```
+
+You can also set an HTML body instead of plain text:
+
+```python
+if message:
+    message.html_body = "<html><body><p>Hello from Python.</p></body></html>"
+    message.save()
+```
+
+To update several fields at once and save in one call, use `update()`:
+
+```python
+if message:
+    message.update(subject="Updated subject", body="New body text", is_unread=False)
 ```
 
 ### Display or send a message
@@ -140,6 +174,12 @@ Run the package as a module:
 python -m outlook --help
 ```
 
+Use `--verbose` / `-v` to enable detailed debug logging for any command:
+
+```bash
+python -m outlook --verbose mailboxes list
+```
+
 List visible mailboxes:
 
 ```bash
@@ -152,10 +192,22 @@ List folders for a mailbox:
 python -m outlook --mailbox "me@company.com" folders list --recursive --max-depth 2
 ```
 
+List folders starting from a specific subfolder:
+
+```bash
+python -m outlook --mailbox "me@company.com" folders list --root "Inbox/Reports" --recursive --max-depth 3
+```
+
 List recent Inbox messages:
 
 ```bash
 python -m outlook messages list Inbox --limit 10 --include-body-preview
+```
+
+List only unread messages:
+
+```bash
+python -m outlook messages list Inbox --unread-only
 ```
 
 Create a draft from the CLI:
@@ -168,8 +220,23 @@ python -m outlook drafts create \
   --display
 ```
 
+Create a draft with CC, BCC, and an attachment, then send immediately:
+
+```bash
+python -m outlook drafts create \
+  --to "alice@company.com" \
+  --cc "manager@company.com" \
+  --bcc "archive@company.com" \
+  --subject "Status update" \
+  --body "Please find the report attached." \
+  --attachment ~/Documents/report.xlsx \
+  --send
+```
+
 ## Notes
 
 - Email address inputs are validated before being written to Outlook fields.
 - Attachment paths must exist on disk.
 - When multiple mailboxes are available, mailbox-specific folder lookups work best when you set `mailbox_address` or pass `--mailbox` in the CLI.
+- Use `OutlookApp` as a context manager (`with OutlookApp(...) as app:`) or call `app.close()` explicitly to release COM resources when you are done.
+- The package exports exception classes (`OutlookConnectionError`, `EmailValidationError`, `PathValidationError`, and others) that you can import and catch for structured error handling.
