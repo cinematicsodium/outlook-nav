@@ -87,8 +87,8 @@ def is_ol_item_accessible(
     if not properties:
         return True
     try:
-        for property in properties:
-            getattr(item, property)
+        for attr_name in properties:
+            getattr(item, attr_name)
         return True
     except Exception:
         return False
@@ -122,12 +122,12 @@ def unpack_collection(
     if count == 0:
         return []
 
-    items = [collection.Item(i + 1) for i in range(count)]
+    items = [collection.Item(item_index + 1) for item_index in range(count)]
     if transformer is None:
-        return cast(list[T], [i for i in items if i is not None])
+        return cast(list[T], [item for item in items if item is not None])
 
     transformed_items = [transformer.from_outlook_item(item) for item in items]
-    return cast(list[ModelT], [i for i in transformed_items if i is not None])
+    return cast(list[ModelT], [item for item in transformed_items if item is not None])
 
 
 def is_exchange_user(user: OlAddressEntry) -> bool:

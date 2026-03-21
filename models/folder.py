@@ -104,21 +104,21 @@ class Folder(ItemModel):
 
         path = f"{parent_path}/{self.name}" if parent_path else self.name
         subfolders = self.subfolders
-        rows = [FolderListing(path=path, depth=depth, subfolder_count=len(subfolders))]
+        folder_listing_entries = [FolderListing(path=path, depth=depth, subfolder_count=len(subfolders))]
 
         if not recursive or depth >= max_depth:
-            return rows
+            return folder_listing_entries
 
-        for child in subfolders:
-            rows.extend(
-                child.walk(
+        for subfolder in subfolders:
+            folder_listing_entries.extend(
+                subfolder.walk(
                     recursive=recursive,
                     max_depth=max_depth,
                     depth=depth + 1,
                     parent_path=path,
                 )
             )
-        return rows
+        return folder_listing_entries
 
     def get_item(self, index: int) -> MailItem | None:
         """Get MailItem at the specified index."""
@@ -135,9 +135,9 @@ class Folder(ItemModel):
         if not isinstance(folder_name, str):
             raise ValueError("folder_name must be a string")
 
-        target: str = folder_name.lower()
+        normalized_folder_name: str = folder_name.lower()
         for folder in self.subfolders:
-            if (folder.name or "").lower() == target:
+            if (folder.name or "").lower() == normalized_folder_name:
                 return folder
         return None
 

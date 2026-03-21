@@ -27,9 +27,9 @@ def _reduce_logs(max_len=10_000):
         if len(logs) < max_len:
             return
 
-        reduced = list(reversed(logs))[:max_len]
-        logs = list(reversed(reduced))
-        text = "\n".join(logs)
+        tail_lines_reversed = list(reversed(logs))[:max_len]
+        trimmed_logs = list(reversed(tail_lines_reversed))
+        text = "\n".join(trimmed_logs)
         path.write_text(text, encoding="utf-8")
     except Exception:
         return

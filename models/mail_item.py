@@ -194,8 +194,8 @@ class MailItem(ItemModel):
 
     @html_body.setter
     def html_body(self, value: str) -> None:
-        body = value.lower()
-        if body.count("html>") != 2:
+        body_lower = value.lower()
+        if body_lower.count("html>") != 2:
             raise ValueError("HTML body must contain an <html> root element.")
         resolve_property(self.ol_mail_item, "HTMLBody", value)
 
@@ -411,7 +411,7 @@ class MailItem(ItemModel):
         return self._to_dict()
 
     def _to_table(self) -> str:
-        fmtd_body = self._fmt_body(self.body or self.html_body or "")
+        formatted_body = self._format_body(self.body or self.html_body or "")
 
         attachments = f"{len(self.attachments)} files(s)"
         parent_folder = self.parent_folder.name if self.parent_folder else ""
@@ -423,9 +423,9 @@ class MailItem(ItemModel):
             ("CC", self.cc),
             ("BCC", self.bcc),
             ("Sent On Behalf Of", self.sent_on_behalf_of_address),
-            ("Sent Time", self._fmt_dt(self.sent_time)),
-            ("Received Time", self._fmt_dt(self.received_time)),
-            ("Body", fmtd_body),
+            ("Sent Time", self._format_datetime(self.sent_time)),
+            ("Received Time", self._format_datetime(self.received_time)),
+            ("Body", formatted_body),
             ("Attachments", attachments),
             ("Size", self.size),
             ("Parent Folder", parent_folder),
@@ -441,22 +441,22 @@ class MailItem(ItemModel):
 
     # ---- Internals / Dunder ----------------------------------------------------
 
-    def _fmt_body(self, body: str):
+    def _format_body(self, body: str):
         if not body or not isinstance(body, str):
             return ""
 
         body = body.replace("\r", "\n")
         lines = body.splitlines()
-        fmtd_lines = [line.strip() for line in lines if line.strip()]
-        return "\n".join(fmtd_lines)
+        formatted_lines = [line.strip() for line in lines if line.strip()]
+        return "\n".join(formatted_lines)
 
-    def _fmt_dt(self, dt: datetime | None) -> str:
-        if dt is None:
+    def _format_datetime(self, datetime_value: datetime | None) -> str:
+        if datetime_value is None:
             return ""
         try:
-            if abs(dt.year - datetime.now().year) >= 1000:
+            if abs(datetime_value.year - datetime.now().year) >= 1000:
                 return ""
-            return str(dt)
+            return str(datetime_value)
         except Exception:
             return ""
 

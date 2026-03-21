@@ -42,7 +42,7 @@ def extract_digits(input_str: str) -> list[str]:
 
 def parse_digits(digit_list: list[str]) -> list[int]:
     try:
-        return [int(d) for d in digit_list]
+        return [int(digit_str) for digit_str in digit_list]
     except Exception:
         return []
 
@@ -96,7 +96,7 @@ def _parse_email_values(email_values: list[str], pattern=re.compile(r"\s*[;,]\s*
         if not email:
             continue
         parts = pattern.split(email)
-        parsed_emails.extend(p.strip() for p in parts if p.strip())
+        parsed_emails.extend(email_part.strip() for email_part in parts if email_part.strip())
     return parsed_emails
 
 
@@ -106,8 +106,8 @@ def _validate_emails_impl(emails: list[str]):
     for email in emails:
         search = EMAIL_REGEX.search(email)
         if not search:
-            err = f"Invalid email address: {email} (format check failed)"
-            errors.append(err)
+            error_message = f"Invalid email address: {email} (format check failed)"
+            errors.append(error_message)
             continue
         valid.append(search.group())
     if errors:
@@ -133,13 +133,13 @@ def validate_paths(paths: str | Path | Iterable[str | Path]) -> list[Path]:
     errors = []
     for path in path_values:
         if not isinstance(path, (str, Path)):
-            err = f"Invalid path: {path} (type: {type(path)})"
-            errors.append(err)
+            error_message = f"Invalid path: {path} (type: {type(path)})"
+            errors.append(error_message)
             continue
         normalized_path = Path(path).expanduser().resolve()
         if not normalized_path.exists():
-            err = f"Path does not exist: {normalized_path}"
-            errors.append(err)
+            error_message = f"Path does not exist: {normalized_path}"
+            errors.append(error_message)
             continue
         valid.append(normalized_path)
     if errors:
