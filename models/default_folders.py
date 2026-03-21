@@ -110,8 +110,12 @@ class DefaultFolders(ItemModel):
         data: dict[str, Folder | None] = {
             name: self.get(name) for name in self.folder_name_map()
         }
-        dct = {k: v for k, v in data.items() if v is not None}
-        return dct
+        folders_dict = {
+            folder_name: folder_object
+            for folder_name, folder_object in data.items()
+            if folder_object is not None
+        }
+        return folders_dict
 
     def as_dict(self) -> dict[str, Folder]:
         """Return default folders as a dictionary."""

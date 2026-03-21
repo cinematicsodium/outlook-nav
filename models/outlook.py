@@ -111,19 +111,19 @@ class OutlookApp:
         self, accounts: list[Account], email: str
     ) -> Account | None:
         """Find an account matching the given email address."""
-        email_lower = email.lower()
+        normalized_email = email.lower()
         for account in accounts:
-            if account.matches(email_lower):
+            if account.matches(normalized_email):
                 return account
         return None
 
     def _log_account_not_found(self, email: str, accounts: list[Account]) -> None:
         """Log a warning if the account is not found."""
         addresses = [account.email_address.lower() for account in accounts]
-        msg = f"Account '{email}' not found among {len(accounts)} accounts. "
-        msg += "Available accounts:\n"
-        msg += "\n".join(f"- {address}" for address in addresses)
-        logger.warning(msg)
+        warning_message = f"Account '{email}' not found among {len(accounts)} accounts. "
+        warning_message += "Available accounts:\n"
+        warning_message += "\n".join(f"- {address}" for address in addresses)
+        logger.warning(warning_message)
 
     @property
     def default_folders(self) -> DefaultFolders:

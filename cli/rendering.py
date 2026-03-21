@@ -23,7 +23,7 @@ def format_datetime(value: datetime | None) -> str:
 
 
 def truncate(value: str, width: int = 80) -> str:
-    cleaned = " ".join(value.split())
-    if len(cleaned) <= width:
-        return cleaned
-    return f"{cleaned[: width - 1].rstrip()}…"
+    normalized_value = " ".join(value.split())
+    if len(normalized_value) <= width:
+        return normalized_value
+    return f"{normalized_value[: width - 1].rstrip()}…"
