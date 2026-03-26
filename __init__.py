@@ -11,6 +11,7 @@ from .models.folder import Folder
 from .models.mail_item import MailItem
 from .models.outlook import OutlookApp
 
+
 __all__ = [
     "OutlookApp",
     "Account",
@@ -22,4 +23,5 @@ __all__ = [
     "OutlookValidationError",
     "EmailValidationError",
     "PathValidationError",
+    "load_outlook_app",
 ]

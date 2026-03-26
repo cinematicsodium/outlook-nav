@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
+
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
 
@@ -10,10 +11,16 @@ from tabulate import tabulate
 from ..enums import ItemType
 from ..logger import log
 from ..protocols import OlMailItem
-from ..utils import get_smtp_address, resolve_property, unpack_collection
+from ..utils import (
+    get_smtp_address,
+    is_builtin_class,
+    resolve_property,
+    unpack_collection,
+)
 from ..validation import validate_datetime, validate_email, validate_paths
 from .address_entry import AddressEntry
 from .node import ItemModel
+from ..type_defs import TableFmtStr
 
 if TYPE_CHECKING:
     from .folder import Folder
@@ -39,7 +46,7 @@ class MailItemData(TypedDict):
     scheduled_delivery_time: datetime | None
     sent_time: datetime | None
     received_time: datetime | None
-    size: int
+    byte_size: int
 
 
 class MailItem(ItemModel):
@@ -64,7 +71,9 @@ class MailItem(ItemModel):
     def __init__(self, item: OlMailItem):
         super().__init__(item)
         self.ol_mail_item = item
-        self._message_table: Any = None
+        self._table_item: Any = None
+        self._table_text: str = ""
+        self._as_table_output: str = ""
 
     # ---- Identity / Threading -------------------------------------------------
 
@@ -202,7 +211,7 @@ class MailItem(ItemModel):
     @property
     def table(self):
         """Gets or sets a Word-based table object within the email body."""
-        return self._message_table
+        return self._table_item
 
     @table.setter
     def table(self, value):
@@ -212,7 +221,9 @@ class MailItem(ItemModel):
         table.Borders.Enable = False
         table.PreferredWidthType = 1
         table.PreferredWidth = 8 * 72
-        self._message_table = table.Cell(1, 1).Range.Text = value
+        self._table_text = value
+        table_item = table.Cell(1, 1).Range.Text = value
+        self._table_item = table_item
 
     @property
     def attachments(self) -> list[str]:
@@ -256,9 +267,13 @@ class MailItem(ItemModel):
         return self.ol_mail_item.ReceivedTime
 
     @property
-    def size(self) -> int:
+    def size_bytes(self) -> int:
         """Retrieves the total size of the email item in bytes."""
         return self.ol_mail_item.Size
+
+    @property
+    def size_megabytes(self) -> float:
+        return round(self.size_bytes / (1024**2), 2)
 
     @property
     def is_unread(self) -> bool:
@@ -305,6 +320,9 @@ class MailItem(ItemModel):
 
         if self.table and not (self.body or self.html_body):
             self.body = self.table
+
+        if self._as_table_output == "":
+            self._as_table_output = self.as_table()
 
         try:
             self.display()
@@ -389,7 +407,7 @@ class MailItem(ItemModel):
     # ---- Serialization ----------------------------------------------------------
 
     def _to_dict(self) -> MailItemData:
-        return MailItemData(
+        data = MailItemData(
             conversation_index=self.conversation_index,
             conversation_id=self.conversation_id,
             sender_address=self.sender_address,
@@ -404,57 +422,84 @@ class MailItem(ItemModel):
             scheduled_delivery_time=self.scheduled_delivery_time,
             sent_time=self.sent_time,
             received_time=self.received_time,
-            size=self.size,
+            byte_size=self.size_bytes,
         )
+        cleaned = {key: self._format_val(val) for key, val in data.items()}
+        return cleaned
 
     def as_dict(self) -> MailItemData:
         return self._to_dict()
 
-    def _to_table(self) -> str:
-        formatted_body = self._format_body(self.body or self.html_body or "")
+    def as_table(
+        self,
+        table_format: TableFmtStr = "grid",
+        table_width: int | None = 100,
+        body_char_limit: int | None = 80,
+    ) -> str:
+        if (output := self._as_table_output) != "":
+            self._as_table_output = ""
+            return output
+
+        parent_folder_name = self.parent_folder.name if self.parent_folder else ""
 
         attachments = f"{len(self.attachments)} files(s)"
-        parent_folder = self.parent_folder.name if self.parent_folder else ""
 
-        table_data = (
-            ("Subject", self.subject),
-            ("Sender", self.sender_address),
-            ("To", self.to),
-            ("CC", self.cc),
-            ("BCC", self.bcc),
-            ("Sent On Behalf Of", self.sent_on_behalf_of_address),
-            ("Sent Time", self._format_datetime(self.sent_time)),
-            ("Received Time", self._format_datetime(self.received_time)),
-            ("Body", formatted_body),
-            ("Attachments", attachments),
-            ("Size", self.size),
-            ("Parent Folder", parent_folder),
-            ("Conversation ID", self.conversation_id),
-            ("Conversation Index", self.conversation_index),
-            ("Entry ID", self.entry_id),
-        )
-        table = tabulate(table_data, tablefmt="grid", maxcolwidths=80)
+        body_selection = self.body or self._table_text or ""
+        body = self._format_body(body_selection, body_char_limit)
+
+        size = f"{self.size_bytes} bytes ({self.size_megabytes} MB)"
+
+        scheduled = self._format_datetime(self.scheduled_delivery_time)
+        sent = self._format_datetime(self.sent_time)
+        received = self._format_datetime(self.received_time)
+
+        data = {
+            "Subject": self.subject,
+            "Sender": self.sender_address,
+            "To": self.to,
+            "CC": self.cc,
+            "BCC": self.bcc,
+            "Sent On Behalf Of": self.sent_on_behalf_of_address,
+            "Scheduled Delivery Time": scheduled,
+            "Sent Time": sent,
+            "Received Time": received,
+            "Body": body,
+            "Attachments": attachments,
+            "Size": size,
+            "Parent Folder": parent_folder_name,
+            "Conversation ID": self.conversation_id,
+            "Conversation Index": self.conversation_index,
+            "Entry ID": self.entry_id,
+        }
+        items = data.items()
+        table = tabulate(items, tablefmt=table_format, maxcolwidths=table_width).strip()
+        self._as_table_output = table
         return table
-
-    def as_table(self) -> str:
-        return self._to_table()
 
     # ---- Internals / Dunder ----------------------------------------------------
 
-    def _format_body(self, body: str):
+    def _format_val(self, val: Any):
+        if isinstance(val, str):
+            lines = [
+                " ".join(line.strip().split())
+                for line in val.splitlines()
+                if line.strip()
+            ]
+            return "\n".join(lines)
+        return val if is_builtin_class(val) else str(val)
+
+    def _format_body(self, body: str, char_limit: int | None = None):
         if not body or not isinstance(body, str):
             return ""
-
-        body = body.replace("\r", "\n")
-        lines = body.splitlines()
-        formatted_lines = [line.strip() for line in lines if line.strip()]
-        return "\n".join(formatted_lines)
+        formatted = self._format_val(body)
+        formatted = formatted if isinstance(formatted, str) else body
+        return formatted[:char_limit] if isinstance(char_limit, int) else formatted
 
     def _format_datetime(self, datetime_value: datetime | None) -> str:
         if datetime_value is None:
             return ""
         try:
-            if abs(datetime_value.year - datetime.now().year) >= 1000:
+            if abs(datetime_value.year - datetime.now().year) >= 100:
                 return ""
             return str(datetime_value)
         except Exception:

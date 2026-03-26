@@ -2,15 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from enum import IntEnum
-from typing import TYPE_CHECKING, Any, cast, overload
+from typing import Any, cast, overload
 
-if TYPE_CHECKING:
-    from .models.node import ItemModel
-
-try:
-    import pywintypes  # type: ignore
-except ImportError:  # pragma: no cover - depends on Windows/pywin32
-    pywintypes = None
+import pywintypes  # type: ignore
 
 from .constants import SMTP_ADDRESS_SCHEMA, UNSET
 from .enums import AddressUserType
@@ -168,3 +162,10 @@ def get_smtp_address(user: OlAddressEntry) -> LowerStr:
             return str(user.Address).lower()
     except Exception:
         return ""
+
+
+def is_builtin_class(obj) -> bool:
+    try:
+        return type(obj).__module__ == "builtins"
+    except Exception:
+        return False
