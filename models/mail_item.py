@@ -20,7 +20,7 @@ from ..utils import (
 from ..validation import validate_datetime, validate_email, validate_paths
 from .address_entry import AddressEntry
 from .node import ItemModel
-from ..type_defs import TableFmtStr
+from ..type_defs import TableFmtStr, StrPath
 
 if TYPE_CHECKING:
     from .folder import Folder
@@ -335,6 +335,14 @@ class MailItem(ItemModel):
             self.ol_mail_item.Save()
         except Exception:
             log.exception("Failed to save email '%s'", self.subject)
+
+    def export(self, output_path: StrPath) -> None:
+        try:
+            target = Path(output_path).expanduser().resolve()
+            target.parent.mkdir(parents=True, exist_ok=True)
+            self.ol_mail_item.SaveAs(str(target))
+        except Exception:
+            log.error("Failed to export email to '%s'", output_path)
 
     def delete(self) -> None:
         try:
