@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from .models.node import ItemModel
 
 LowerStr: TypeAlias = str
+StrPath: TypeAlias = str | Path
 
 T = TypeVar("T", covariant=True)
 
