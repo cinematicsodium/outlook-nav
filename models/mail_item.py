@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 
+# from inspect import isbuiltin
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
 
@@ -11,6 +12,7 @@ from tabulate import tabulate
 from ..enums import ItemType
 from ..logger import log
 from ..protocols import OlMailItem
+from ..type_defs import StrPath, TableFmtStr
 from ..utils import (
     get_smtp_address,
     is_builtin_class,
@@ -20,7 +22,6 @@ from ..utils import (
 from ..validation import validate_datetime, validate_email, validate_paths
 from .address_entry import AddressEntry
 from .node import ItemModel
-from ..type_defs import TableFmtStr, StrPath
 
 if TYPE_CHECKING:
     from .folder import Folder
@@ -70,7 +71,12 @@ class MailItem(ItemModel):
 
     def __init__(self, item: OlMailItem):
         super().__init__(item)
+        import rich
+
+        rich.inspect(item)
+        exit()
         self.ol_mail_item = item
+
         self._table_item: Any = None
         self._table_text: str = ""
         self._as_table_output: str = ""
@@ -144,6 +150,8 @@ class MailItem(ItemModel):
 
     @to.setter
     def to(self, value: str | Iterable[str]) -> None:
+        if not value:
+            return
         self.ol_mail_item.To = validate_email(value)
 
     @property
@@ -153,6 +161,8 @@ class MailItem(ItemModel):
 
     @cc.setter
     def cc(self, value: str | Iterable[str]) -> None:
+        if not value:
+            return
         self.ol_mail_item.CC = validate_email(value)
 
     @property
@@ -162,6 +172,8 @@ class MailItem(ItemModel):
 
     @bcc.setter
     def bcc(self, value: str | Iterable[str]) -> None:
+        if not value:
+            return
         self.ol_mail_item.BCC = validate_email(value)
 
     @property
@@ -185,6 +197,8 @@ class MailItem(ItemModel):
 
     @subject.setter
     def subject(self, value: str) -> None:
+        if not value:
+            return
         self.ol_mail_item.Subject = value
 
     @property
@@ -194,6 +208,8 @@ class MailItem(ItemModel):
 
     @body.setter
     def body(self, value: str) -> None:
+        if not value:
+            return
         self.ol_mail_item.Body = value
 
     @property
@@ -203,6 +219,8 @@ class MailItem(ItemModel):
 
     @html_body.setter
     def html_body(self, value: str) -> None:
+        if not value:
+            return
         body_lower = value.lower()
         if body_lower.count("html>") != 2:
             raise ValueError("HTML body must contain an <html> root element.")
@@ -215,6 +233,8 @@ class MailItem(ItemModel):
 
     @table.setter
     def table(self, value):
+        if not value:
+            return
         word_editor = self.ol_mail_item.GetInspector.WordEditor
         editor_range = word_editor.Range()
         table = word_editor.Tables.Add(editor_range, 1, 1)
@@ -289,11 +309,6 @@ class MailItem(ItemModel):
             )
         self.ol_mail_item.UnRead = value
 
-    @property
-    def _dispatch(self) -> str:
-        """Internal property for primary timestamp or draft status."""
-        return str(self.sent_time or self.received_time or "Draft")
-
     # ---- Actions ----------------------------------------------------------------
 
     def display(self) -> None:
@@ -328,27 +343,27 @@ class MailItem(ItemModel):
             self.display()
             self.ol_mail_item.Send()
         except Exception:
-            log.exception("Failed to send email '%s'", self.subject)
+            log.error("Failed to send email '%s'", self.subject)
 
-    def save(self) -> None:
+    def save_as_draft(self) -> None:
         try:
             self.ol_mail_item.Save()
         except Exception:
-            log.exception("Failed to save email '%s'", self.subject)
+            log.error("Failed to save email '%s'", self.subject)
 
-    def export(self, output_path: StrPath) -> None:
+    def save_as_file(self, output_path: StrPath) -> None:
         try:
             target = Path(output_path).expanduser().resolve()
             target.parent.mkdir(parents=True, exist_ok=True)
             self.ol_mail_item.SaveAs(str(target))
-        except Exception:
-            log.error("Failed to export email to '%s'", output_path)
+        except Exception as e:
+            log.error("Failed to export email to '%s': %s", output_path, e)
 
     def delete(self) -> None:
         try:
             self.ol_mail_item.Delete()
         except Exception:
-            log.exception("Failed to delete email '%s'", self.subject)
+            log.error("Failed to delete email '%s'", self.subject)
 
     def move_to(self, destination: Folder) -> MailItem | None:
 
@@ -376,7 +391,7 @@ class MailItem(ItemModel):
                 getattr(moved_item, "Class", None),
             )
         except Exception:
-            log.exception(
+            log.error(
                 "Failed to move email '%s' to folder '%s'",
                 self.subject,
                 destination.name,
@@ -403,7 +418,7 @@ class MailItem(ItemModel):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        self.save()
+        self.save_as_draft()
 
     def get(self, key: Any, default=None):
         if hasattr(self, key):
@@ -413,27 +428,6 @@ class MailItem(ItemModel):
         return default
 
     # ---- Serialization ----------------------------------------------------------
-
-    def _to_dict(self) -> MailItemData:
-        data = MailItemData(
-            conversation_index=self.conversation_index,
-            conversation_id=self.conversation_id,
-            sender_address=self.sender_address,
-            sent_on_behalf_of_address=self.sent_on_behalf_of_address,
-            to=self.to,
-            cc=self.cc,
-            bcc=self.bcc,
-            recipients=self.recipients,
-            subject=self.subject,
-            body=self.body,
-            attachments=self.attachments,
-            scheduled_delivery_time=self.scheduled_delivery_time,
-            sent_time=self.sent_time,
-            received_time=self.received_time,
-            byte_size=self.size_bytes,
-        )
-        cleaned = {key: self._format_val(val) for key, val in data.items()}
-        return cleaned
 
     def as_dict(self) -> MailItemData:
         return self._to_dict()
@@ -484,7 +478,42 @@ class MailItem(ItemModel):
         self._as_table_output = table
         return table
 
-    # ---- Internals / Dunder ----------------------------------------------------
+    # ---- Dunder / Internals ----------------------------------------------------
+
+    def __str__(self) -> str:
+        return f"[{self._dispatch}] {self.sender_address}: {self.subject}"
+
+    def __repr__(self) -> str:
+        return (
+            f"MailItem(subject={self.subject!r}, sender_address={self.sender_address!r}, "
+            f"to={self.to!r}, sent_time={self.sent_time!r})"
+        )
+
+    @property
+    def _dispatch(self) -> str:
+        """Internal property for primary timestamp or draft status."""
+        return str(self.sent_time or self.received_time or "Draft")
+
+    def _to_dict(self) -> MailItemData:
+        data = MailItemData(
+            conversation_index=self.conversation_index,
+            conversation_id=self.conversation_id,
+            sender_address=self.sender_address,
+            sent_on_behalf_of_address=self.sent_on_behalf_of_address,
+            to=self.to,
+            cc=self.cc,
+            bcc=self.bcc,
+            recipients=self.recipients,
+            subject=self.subject,
+            body=self.body,
+            attachments=self.attachments,
+            scheduled_delivery_time=self.scheduled_delivery_time,
+            sent_time=self.sent_time,
+            received_time=self.received_time,
+            byte_size=self.size_bytes,
+        )
+        cleaned = {key: self._format_val(val) for key, val in data.items()}
+        return cleaned
 
     def _format_val(self, val: Any):
         if isinstance(val, str):
@@ -512,12 +541,3 @@ class MailItem(ItemModel):
             return str(datetime_value)
         except Exception:
             return ""
-
-    def __str__(self) -> str:
-        return f"[{self._dispatch}] {self.sender_address}: {self.subject}"
-
-    def __repr__(self) -> str:
-        return (
-            f"MailItem(subject={self.subject!r}, sender_address={self.sender_address!r}, "
-            f"to={self.to!r}, sent_time={self.sent_time!r})"
-        )

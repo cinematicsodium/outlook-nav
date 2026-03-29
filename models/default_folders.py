@@ -105,25 +105,9 @@ class DefaultFolders(ItemModel):
         """Return all default folders as a list."""
         return self.as_list()
 
-    def _to_dict(self) -> dict[str, Folder]:
-        """Return dictionary of default folders."""
-        data: dict[str, Folder | None] = {
-            name: self.get(name) for name in self.folder_name_map()
-        }
-        folders_dict = {
-            folder_name: folder_object
-            for folder_name, folder_object in data.items()
-            if folder_object is not None
-        }
-        return folders_dict
-
     def as_dict(self) -> dict[str, Folder]:
         """Return default folders as a dictionary."""
         return self._to_dict()
-
-    def _to_list(self) -> list[Folder]:
-        """Return list of default folders."""
-        return list(self.as_dict().values())
 
     def as_list(self) -> list[Folder]:
         """Return default folders as a list."""
@@ -150,17 +134,6 @@ class DefaultFolders(ItemModel):
             self._cache[folder_type] = None
             return None
 
-    def _get_default_folder(self, folder: str | FolderType) -> Folder | None:
-        """Backward-compatible wrapper for retrieving a default folder."""
-        return self.get(folder)
-
-    def _resolve_folder_type(self, folder: str | FolderType) -> FolderType | None:
-        if isinstance(folder, FolderType):
-            return folder
-        if not folder:
-            return None
-        return self.folder_name_map().get(folder)
-
     def __iter__(self) -> Iterator[Folder]:
         """Iterate over default folders."""
         yield from self.all
@@ -174,6 +147,33 @@ class DefaultFolders(ItemModel):
         """Return repr representation."""
         folders = ", ".join(repr(f) for f in self.as_list())
         return f"DefaultFolders({folders})"
+
+    def _to_dict(self) -> dict[str, Folder]:
+        """Return dictionary of default folders."""
+        data: dict[str, Folder | None] = {
+            name: self.get(name) for name in self.folder_name_map()
+        }
+        folders_dict = {
+            folder_name: folder_object
+            for folder_name, folder_object in data.items()
+            if folder_object is not None
+        }
+        return folders_dict
+
+    def _to_list(self) -> list[Folder]:
+        """Return list of default folders."""
+        return list(self.as_dict().values())
+
+    def _get_default_folder(self, folder: str | FolderType) -> Folder | None:
+        """Backward-compatible wrapper for retrieving a default folder."""
+        return self.get(folder)
+
+    def _resolve_folder_type(self, folder: str | FolderType) -> FolderType | None:
+        if isinstance(folder, FolderType):
+            return folder
+        if not folder:
+            return None
+        return self.folder_name_map().get(folder)
 
     def _clear_cache(self) -> None:
         """Clear folder cache."""

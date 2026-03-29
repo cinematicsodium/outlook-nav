@@ -97,7 +97,7 @@ if message:
     message.subject = "Weekly status"
     message.body = "Attached is the latest update."
     message.add_attachments("~/Documents/status.xlsx")
-    message.save()
+    message.save_as_draft()
 ```
 
 You can also set an HTML body instead of plain text:
@@ -105,7 +105,7 @@ You can also set an HTML body instead of plain text:
 ```python
 if message:
     message.html_body = "<html><body><p>Hello from Python.</p></body></html>"
-    message.save()
+    message.save_as_draft()
 ```
 
 To update several fields at once and save in one call, use `update()`:

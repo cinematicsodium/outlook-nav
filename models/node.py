@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from abc import ABC
 from typing import Any, ClassVar, Self
 
 from ..enums import ItemType
 from ..utils import is_accessible_ol_item
 
 
-class ItemModel:
+class ItemModel(ABC):
     """Base wrapper for COM-backed Outlook items."""
 
     item_type: ClassVar[ItemType]

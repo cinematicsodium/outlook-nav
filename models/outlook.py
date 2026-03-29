@@ -63,72 +63,6 @@ class OutlookApp:
             logger.exception("Error connecting to Outlook")
             raise
 
-    def _ensure_connection(self) -> None:
-        """Ensure Outlook connection and namespace are established."""
-        try:
-            if self._connection and self._namespace:
-                return
-
-            client = _load_win32_client()
-            self._connection = client.Dispatch("Outlook.Application")
-            self._namespace = self._connection.GetNamespace("MAPI")
-        except Exception:
-            logger.exception("Error establishing Outlook connection")
-            raise
-
-    def _establish_user_account(self) -> None:
-        """Set up the mailbox account based on the email address."""
-        try:
-            accounts = self._list_accounts()
-            if len(accounts) == 1:
-                self.mailbox_account = accounts[0]
-                return
-
-            email = self.mailbox_address
-            if not email:
-                return
-
-            matched_account = self._find_account_by_email(accounts, email)
-            if matched_account:
-                self.mailbox_account = matched_account
-                logger.info(f"Successfully set default account to: {email}")
-                return
-
-            self._log_account_not_found(email, accounts)
-        except Exception:
-            if self.mailbox_address:
-                logger.warning(
-                    "Unable to resolve Outlook mailbox account for '%s'",
-                    self.mailbox_address,
-                    exc_info=True,
-                )
-            else:
-                logger.warning(
-                    "Unable to inspect Outlook accounts during initialization",
-                    exc_info=True,
-                )
-            return
-
-    def _find_account_by_email(
-        self, accounts: list[Account], email: str
-    ) -> Account | None:
-        """Find an account matching the given email address."""
-        normalized_email = email.lower()
-        for account in accounts:
-            if account.matches(normalized_email):
-                return account
-        return None
-
-    def _log_account_not_found(self, email: str, accounts: list[Account]) -> None:
-        """Log a warning if the account is not found."""
-        addresses = [account.email_address.lower() for account in accounts]
-        warning_message = (
-            f"Account '{email}' not found among {len(accounts)} accounts. "
-        )
-        warning_message += "Available accounts:\n"
-        warning_message += "\n".join(f"- {address}" for address in addresses)
-        logger.warning(warning_message)
-
     @property
     def default_folders(self) -> DefaultFolders:
         """Return DefaultFolders instance for Outlook's default folders."""
@@ -289,6 +223,87 @@ class OutlookApp:
         """Exit context manager and close resources."""
         self.close()
 
+    def __repr__(self):
+        account_email = self.mailbox_account.email_address
+        return (
+            f"OutlookApp("
+            f"mailbox_address={self.mailbox_address!r}, "
+            f"account={account_email!r}, "
+            f"connected={self._connection is not None}, "
+            f"namespace={self._namespace is not None}"
+            f")"
+        )
+
+    def __str__(self) -> str:
+        return self.__repr__()
+
+    def _ensure_connection(self) -> None:
+        """Ensure Outlook connection and namespace are established."""
+        try:
+            if self._connection and self._namespace:
+                return
+
+            client = _load_win32_client()
+            self._connection = client.Dispatch("Outlook.Application")
+            self._namespace = self._connection.GetNamespace("MAPI")
+
+        except Exception:
+            logger.exception("Error establishing Outlook connection")
+            raise
+
+    def _establish_user_account(self) -> None:
+        """Set up the mailbox account based on the email address."""
+        try:
+            accounts = self._list_accounts()
+            if len(accounts) == 1:
+                self.mailbox_account = accounts[0]
+                return
+
+            email = self.mailbox_address
+            if not email:
+                return
+
+            matched_account = self._find_account_by_email(accounts, email)
+            if matched_account:
+                self.mailbox_account = matched_account
+                logger.info(f"Successfully set default account to: {email}")
+                return
+
+            self._log_account_not_found(email, accounts)
+        except Exception:
+            if self.mailbox_address:
+                logger.warning(
+                    "Unable to resolve Outlook mailbox account for '%s'",
+                    self.mailbox_address,
+                    exc_info=True,
+                )
+            else:
+                logger.warning(
+                    "Unable to inspect Outlook accounts during initialization",
+                    exc_info=True,
+                )
+            return
+
+    def _find_account_by_email(
+        self, accounts: list[Account], email: str
+    ) -> Account | None:
+        """Find an account matching the given email address."""
+        normalized_email = email.lower()
+        for account in accounts:
+            if account.matches(normalized_email):
+                return account
+        return None
+
+    def _log_account_not_found(self, email: str, accounts: list[Account]) -> None:
+        """Log a warning if the account is not found."""
+        addresses = [account.email_address.lower() for account in accounts]
+        warning_message = (
+            f"Account '{email}' not found among {len(accounts)} accounts. "
+        )
+        warning_message += "Available accounts:\n"
+        warning_message += "\n".join(f"- {address}" for address in addresses)
+        logger.warning(warning_message)
+
     def _require_connection(self) -> OlApplication:
         """Return Outlook connection or raise if unavailable."""
         if self._connection is None:
@@ -318,17 +333,3 @@ class OutlookApp:
             msg = f"Expected item of type {target_type_name}, got {item_type_name}"
             raise TypeError(msg)
         return cast(T, item)
-
-    def __repr__(self):
-        account_email = self.mailbox_account.email_address
-        return (
-            f"OutlookApp("
-            f"mailbox_address={self.mailbox_address!r}, "
-            f"account={account_email!r}, "
-            f"connected={self._connection is not None}, "
-            f"namespace={self._namespace is not None}"
-            f")"
-        )
-
-    def __str__(self) -> str:
-        return self.__repr__()

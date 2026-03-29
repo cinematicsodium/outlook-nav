@@ -116,7 +116,7 @@ def unpack_collection(
     if count == 0:
         return []
 
-    items = [collection.Item(item_index + 1) for item_index in range(count)]
+    items = [collection.Item(idx) for idx in range(1, count + 1)]
     if transformer is None:
         return cast(list[T], [item for item in items if item is not None])
 

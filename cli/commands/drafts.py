@@ -80,7 +80,7 @@ def create_draft(
         typer.secho("Message sent.", fg=typer.colors.GREEN)
         return
 
-    message.save()
+    message.save_as_draft()
     if display:
         message.display()
 
