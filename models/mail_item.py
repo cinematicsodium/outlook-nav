@@ -27,9 +27,9 @@ if TYPE_CHECKING:
     from .folder import Folder
 
 
-class RecipientInfo(TypedDict):
+class MailRecipient(TypedDict):
     name: str
-    address: str
+    email_address: str
 
 
 class MailItemData(TypedDict):
@@ -40,7 +40,7 @@ class MailItemData(TypedDict):
     to: str
     cc: str
     bcc: str
-    recipients: list[RecipientInfo]
+    recipients: list[MailRecipient]
     subject: str
     body: str
     attachments: list[str]
@@ -73,8 +73,6 @@ class MailItem(ItemModel):
         super().__init__(item)
         import rich
 
-        rich.inspect(item)
-        exit()
         self.ol_mail_item = item
 
         self._table_item: Any = None
@@ -177,17 +175,22 @@ class MailItem(ItemModel):
         self.ol_mail_item.BCC = validate_email(value)
 
     @property
-    def recipients(self) -> list[RecipientInfo]:
-        """Returns a list of RecipientInfo dictionaries for all recipients of the email."""
-        recipients = unpack_collection(
-            self.ol_mail_item.Recipients, transformer=AddressEntry
-        )
-        recipient_info = [
-            RecipientInfo(name=entry.name, address=entry.email_address)
-            for entry in recipients
-        ]
-        return recipient_info
+    def recipients(self) -> list[MailRecipient]:
+        """Returns a list of MailRecipient dictionaries for all recipients of the email."""
+        ol_recipients = unpack_collection(self.ol_mail_item.Recipients)
+        entries = []
 
+        for recipient in ol_recipients:
+            if recipient is None:
+                continue
+            if (entry := AddressEntry.from_outlook_item(recipient.AddressEntry)) is not None:
+                entries.append(
+                    MailRecipient(
+                        name=entry.name,
+                        email_address=entry.email_address,
+                    )
+                )
+        return entries
     # ---- Content ---------------------------------------------------------------
 
     @property
