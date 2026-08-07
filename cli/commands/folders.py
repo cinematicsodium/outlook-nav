@@ -1,12 +1,10 @@
 from __future__ import annotations
-
 import typer
-
 from ..context import create_client, resolve_account, resolve_folder
 from ..rendering import echo_table
 
 app = typer.Typer(
-    help="Browse mailbox folders and inspect mailbox structure.",
+    help="Browse account folders and inspect account structure.",
     no_args_is_help=True,
 )
 
@@ -14,9 +12,9 @@ app = typer.Typer(
 @app.command("list")
 def list_folders(
     ctx: typer.Context,
-    mailbox: str | None = typer.Option(
+    account: str | None = typer.Option(
         None,
-        "--mailbox",
+        "--account",
         help="Mailbox display name or SMTP address to inspect for this command.",
     ),
     root: str | None = typer.Option(
@@ -37,11 +35,10 @@ def list_folders(
         help="Maximum child depth to include when using --recursive.",
     ),
 ) -> None:
-    """List folders for a mailbox or a specific folder branch."""
+    """List folders for a account or a specific folder branch."""
     client = create_client(ctx)
-
     if root:
-        base_folder = resolve_folder(client, ctx, root, mailbox=mailbox)
+        base_folder = resolve_folder(client, ctx, root, account=account)
         rows = [
             entry.as_row()
             for entry in base_folder.walk(
@@ -50,9 +47,9 @@ def list_folders(
             )
         ]
     else:
-        account = resolve_account(client, ctx, mailbox=mailbox)
-        rows: list[tuple[object, ...]] = []
-        for folder in account.folders:
+        resolved_account = resolve_account(client, ctx, account=account)
+        rows = []
+        for folder in resolved_account.folders:
             rows.extend(
                 entry.as_row()
                 for entry in folder.walk(
@@ -60,5 +57,4 @@ def list_folders(
                     max_depth=max_depth,
                 )
             )
-
     echo_table(rows, headers=["Folder", "Depth", "Subfolders"])

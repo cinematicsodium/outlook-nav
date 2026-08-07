@@ -1,7 +1,5 @@
 from __future__ import annotations
-
 import typer
-
 from ..context import create_client, resolve_folder
 from ..rendering import echo_table, format_datetime, truncate
 
@@ -18,9 +16,9 @@ def list_messages(
         ...,
         help="Folder name or slash-delimited path, such as 'Inbox' or 'Inbox/Reports'.",
     ),
-    mailbox: str | None = typer.Option(
+    account: str | None = typer.Option(
         None,
-        "--mailbox",
+        "--account",
         help="Mailbox display name or SMTP address to inspect for this command.",
     ),
     limit: int = typer.Option(
@@ -44,25 +42,20 @@ def list_messages(
 ) -> None:
     """List recent messages from a folder."""
     client = create_client(ctx)
-    folder = resolve_folder(client, ctx, folder_path, mailbox=mailbox)
+    folder = resolve_folder(client, ctx, folder_path, account=account)
     messages = folder.list_messages(limit=limit, unread_only=unread_only)
-
     rows: list[tuple[object, ...]] = []
     for message in messages:
-        received = format_datetime(message.received_time or message.sent_time)
+        received = format_datetime(message.received_at or message.sent_at)
         subject = truncate(message.subject or "(no subject)", width=60)
         sender = truncate(message.sender_address or message.sender_name, width=36)
-        unread = "yes" if message.is_unread else ""
-
+        unread = "yes" if message.unread else ""
         if include_body_preview:
             preview = truncate(message.body, width=70)
             rows.append((received, unread, sender, subject, preview))
             continue
-
         rows.append((received, unread, sender, subject))
-
     headers = ["Received", "Unread", "From", "Subject"]
     if include_body_preview:
         headers.append("Preview")
-
     echo_table(rows, headers=headers)

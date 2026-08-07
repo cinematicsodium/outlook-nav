@@ -1,6 +1,6 @@
 __all__ = [
     "drafts",
     "folders",
-    "mailboxes",
+    "accounts",
     "messages",
 ]

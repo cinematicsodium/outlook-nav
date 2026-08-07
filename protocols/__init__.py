@@ -1,37 +1,31 @@
-from .ol_account import OlAccount
-from .ol_accounts_collection import OlAccountsCollection
-from .ol_address_entry import OlAddressEntry
-from .ol_application import OlApplication
-from .ol_attachment import OlAttachment
-from .ol_collection import OlCollection, T
-from .ol_dispatch import OlDispatch
-from .ol_editor import OlEditor
-from .ol_exchange_user import OlExchangeUser
-from .ol_folder import OlFolder
-from .ol_inspector import OlInspector
-from .ol_item import OlItem
-from .ol_mail_item import OlMailItem
-from .ol_namespace import OlNamespace
-from .ol_property_accessor import OlPropertyAccessor
-from .ol_recipient import OlRecipient
-from .ol_store import OlStore
+from typing import Any, Protocol, TypeAlias, TypeVar
+
+T = TypeVar("T", covariant=True)
+
+
+class OlCollection(Protocol[T]):
+    Count: int
+
+    def Item(self, index: int, /) -> T: ...
+
+
+OlAccount: TypeAlias = Any
+OlAddressEntry: TypeAlias = Any
+OlApplication: TypeAlias = Any
+OlFolder: TypeAlias = Any
+OlMailItem: TypeAlias = Any
+OlNamespace: TypeAlias = Any
+OlObject: TypeAlias = Any
+OlStore: TypeAlias = Any
 
 __all__ = [
     "OlAccount",
-    "OlAccountsCollection",
     "OlAddressEntry",
     "OlApplication",
-    "OlAttachment",
     "OlCollection",
-    "OlDispatch",
-    "OlEditor",
-    "OlExchangeUser",
     "OlFolder",
-    "OlInspector",
-    "OlItem",
     "OlMailItem",
     "OlNamespace",
-    "OlPropertyAccessor",
-    "OlRecipient",
+    "OlObject",
     "OlStore",
 ]

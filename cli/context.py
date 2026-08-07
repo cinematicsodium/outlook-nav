@@ -1,41 +1,39 @@
 from __future__ import annotations
-
 from dataclasses import dataclass
-
+from typing import NoReturn
 import typer
-
-from ..enums import FolderType
-from ..exceptions import OutlookConnectionError
+from ..enums import FolderEnum
+from ..exceptions import OutlookError
 from ..models.account import Account
 from ..models.folder import Folder
-from ..models.outlook import OutlookApp
+from ..models.outlook import Outlook
 
 
 @dataclass(slots=True)
 class CLIState:
-    mailbox: str | None = None
+    account: str | None = None
     verbose: bool = False
 
 
 DEFAULT_FOLDERS = {
-    "archived mail": FolderType.ARCHIVED_MAIL,
-    "archive": FolderType.ARCHIVED_MAIL,
-    "calendar": FolderType.CALENDAR,
-    "conflicts": FolderType.CONFLICTS,
-    "contacts": FolderType.CONTACTS,
-    "deleted items": FolderType.DELETED_ITEMS,
-    "drafts": FolderType.DRAFTS,
-    "inbox": FolderType.INBOX,
-    "journal": FolderType.JOURNAL,
-    "junk": FolderType.JUNK,
-    "local failures": FolderType.LOCAL_FAILURES,
-    "notes": FolderType.NOTES,
-    "outbox": FolderType.OUTBOX,
-    "sent mail": FolderType.SENT_MAIL,
+    "archived mail": FolderEnum.ARCHIVED_MAIL,
+    "archive": FolderEnum.ARCHIVED_MAIL,
+    "calendar": FolderEnum.CALENDAR,
+    "conflicts": FolderEnum.CONFLICTS,
+    "contacts": FolderEnum.CONTACTS,
+    "deleted items": FolderEnum.DELETED_ITEMS,
+    "drafts": FolderEnum.DRAFTS,
+    "inbox": FolderEnum.INBOX,
+    "journal": FolderEnum.JOURNAL,
+    "junk": FolderEnum.JUNK,
+    "local failures": FolderEnum.LOCAL_FAILURES,
+    "notes": FolderEnum.NOTES,
+    "outbox": FolderEnum.OUTBOX,
+    "sent mail": FolderEnum.SENT_MAIL,
 }
 
 
-def abort(message: str, exit_code: int = 1) -> None:
+def abort(message: str, exit_code: int = 1) -> NoReturn:
     typer.secho(message, fg=typer.colors.RED, err=True)
     raise typer.Exit(exit_code)
 
@@ -47,71 +45,56 @@ def get_state(ctx: typer.Context) -> CLIState:
     return CLIState()
 
 
-def create_client(ctx: typer.Context) -> OutlookApp:
+def create_client(ctx: typer.Context) -> Outlook:
     state = get_state(ctx)
-    mailbox_address = state.mailbox if state.mailbox and "@" in state.mailbox else None
-
     try:
-        return OutlookApp(mailbox_address=mailbox_address)
-    except OutlookConnectionError as exc:
-        abort(
-            f"{exc} This CLI requires Microsoft Outlook and pywin32 on Windows."
-        )
+        return Outlook(address=state.account)
+    except OutlookError as exc:
+        abort(str(exc))
     except Exception as exc:
         abort(f"Unable to connect to Outlook: {exc}")
 
 
 def resolve_account(
-    client: OutlookApp,
+    client: Outlook,
     ctx: typer.Context,
-    mailbox: str | None = None,
+    account: str | None = None,
 ) -> Account:
     state = get_state(ctx)
-    selected_mailbox = mailbox or state.mailbox
-
-    if selected_mailbox:
-        if client.mailbox_account is not None:
-            if client.mailbox_account.matches(selected_mailbox):
-                return client.mailbox_account
-
-        account = client.get_mailbox(selected_mailbox)
-        if account is not None:
-            return account
-
-        abort(f"Mailbox not found: {selected_mailbox}")
-
-    if client.mailbox_account is not None:
-        return client.mailbox_account
-
-    mailboxes = client.list_mailboxes()
-    if len(mailboxes) == 1:
-        return mailboxes[0]
-
-    abort("Multiple mailboxes are available. Use --mailbox to select one.")
+    selection = account or state.account
+    if selection:
+        if client.account is not None:
+            if client.account.matches(selection):
+                return client.account
+        resolved = client.find_account(selection)
+        if resolved is not None:
+            return resolved
+        abort(f"Account not found: {selection}")
+    if client.account is not None:
+        return client.account
+    accounts = client.accounts
+    if len(accounts) == 1:
+        return accounts[0]
+    abort("Multiple accounts are available. Use --account to select one.")
 
 
 def resolve_folder(
-    client: OutlookApp,
+    client: Outlook,
     ctx: typer.Context,
     folder_path: str,
-    mailbox: str | None = None,
+    account: str | None = None,
 ) -> Folder:
     normalized_path = folder_path.strip()
     if not normalized_path:
         abort("Folder path cannot be empty.")
-
-    selected_mailbox = mailbox or get_state(ctx).mailbox
-    account = resolve_account(client, ctx, mailbox=mailbox)
-    folder = account.find_folder(normalized_path)
+    selected_account = account or get_state(ctx).account
+    resolved_account = resolve_account(client, ctx, account=account)
+    folder = resolved_account.find_folder(normalized_path)
     if folder is not None:
         return folder
-
     folder_enum = DEFAULT_FOLDERS.get(normalized_path.lower())
-    if folder_enum is not None and not selected_mailbox:
-        default_folder = client.get_default_folder(folder_enum)
+    if folder_enum is not None and not selected_account:
+        default_folder = client.defaults.get(folder_enum)
         if default_folder is not None:
             return default_folder
-
-    abort(
-        f"Folder not found in mailbox '{account.name}': {normalized_path}"
-    )
+    abort(f"Folder not found in account '{resolved_account.name}': {normalized_path}")

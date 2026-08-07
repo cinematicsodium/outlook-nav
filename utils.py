@@ -1,88 +1,25 @@
 from __future__ import annotations
-
 from collections.abc import Iterable
 from enum import IntEnum
-from typing import Any, cast, overload
+from typing import Callable, cast, overload
 
-import pywintypes  # type: ignore
-
-from .constants import SMTP_ADDRESS_SCHEMA, UNSET
-from .enums import AddressUserType
-from .protocols import OlAddressEntry, OlCollection, OlItem
+from .constants import _UNSET, SMTP_ADDRESS_SCHEMA
+from .protocols import OlAddressEntry, OlCollection, OlObject
 from .type_defs import LowerStr, ModelT, RawT, T
 
 
-def resolve_property(obj: Any, property_name: str, new_value: Any = UNSET) -> T | None:
-    """Resolves a property on an object, optionally setting it to a new value."""
-    try:
-        if not hasattr(obj, property_name):
-            if new_value is UNSET:
-                return None
-            raise AttributeError(f"Object does not have property '{property_name}'.")
-
-        if new_value is not UNSET:
-            try:
-                setattr(obj, property_name, new_value)
-            except Exception:
-                pass
-
-        if not hasattr(obj, property_name):
-            return None
-
-        return cast(T, getattr(obj, property_name))
-    except Exception as e:
-        if is_interface_error(e):
-            return None
-        raise
-
-
-def resolve_method(obj: Any, method_name: str, *args: Any, **kwargs: Any) -> T | None:
-    """Resolves a method on an object and calls it with the given arguments."""
-    try:
-        if not hasattr(obj, method_name):
-            raise AttributeError(f"Object does not have method '{method_name}'.")
-
-        method = getattr(obj, method_name)
-        if not callable(method):
-            raise AttributeError(f"'{method_name}' is not a callable method.")
-
-        return cast(T, method(*args, **kwargs))
-    except Exception as e:
-        if is_interface_error(e):
-            return None
-        raise
-
-
-def is_interface_error(e: Exception) -> bool:
-    if pywintypes is None:
-        return False
-    return isinstance(e, pywintypes.com_error)
-
-
 def is_accessible_ol_item(
-    item: OlItem, target_type: IntEnum, properties: Iterable[str] | None = None
+    item: OlObject, target_type: IntEnum, properties: Iterable[str] | None = None
 ) -> bool:
-    if not hasattr(item, "Class"):
+    if item is None:
         return False
-    rules = (
-        item.Class == target_type,
-        is_ol_item_accessible(item, properties),
-    )
-    return all(rules)
-
-
-def is_ol_item_accessible(
-    item: OlItem, properties: Iterable[str] | None = None
-) -> bool:
-    """
-    Attempts to access standard attributes to ensure the item isn't
-    restricted by security systems.
-    """
-    if not properties:
-        return True
+    item_type = getattr(item, "Class", _UNSET)
+    if item_type is not _UNSET:
+        return item_type == target_type
+    properties = properties or ()
     try:
-        for attr_name in properties:
-            getattr(item, attr_name)
+        for name in properties:
+            getattr(item, name)
         return True
     except Exception:
         return False
@@ -93,55 +30,45 @@ def unpack_collection(
     collection: OlCollection[T] | None,
     *,
     transformer: None = None,
+    limit: int | None = None,
+    predicate: Callable[[T], bool] | None = None,
 ) -> list[T]: ...
-
-
 @overload
 def unpack_collection(
     collection: OlCollection[RawT] | None,
     *,
     transformer: type[ModelT],
+    limit: int | None = None,
+    predicate: Callable[[RawT], bool] | None = None,
 ) -> list[ModelT]: ...
-
-
 def unpack_collection(
     collection: OlCollection[T] | None,
     *,
     transformer: type[ModelT] | None = None,
+    limit: int | None = None,
+    predicate: Callable[[T], bool] | None = None,
 ) -> list[T] | list[ModelT]:
-    if collection is None:
+    if collection is None or limit is not None and limit <= 0:
         return []
-
-    count = collection.Count
-    if count == 0:
-        return []
-
-    items = [collection.Item(idx) for idx in range(1, count + 1)]
-    if transformer is None:
-        return cast(list[T], [item for item in items if item is not None])
-
-    transformed_items = [transformer.from_outlook_item(item) for item in items]
-    return cast(list[ModelT], [item for item in transformed_items if item is not None])
-
-
-def is_exchange_user(user: OlAddressEntry) -> bool:
-    rules = [
-        user.Type == "EX",
-        user.AddressEntryUserType == AddressUserType.EXCHANGE_REMOTE_USER,
-        user.AddressEntryUserType == AddressUserType.EXCHANGE_USER,
-    ]
-    return any(rules)
+    result = []
+    for idx in range(1, collection.Count + 1):
+        item = collection.Item(idx)
+        if item is None or predicate is not None and not predicate(item):
+            continue
+        value = item if transformer is None else transformer.from_outlook_item(item)
+        if value is not None:
+            result.append(value)
+            if limit is not None and len(result) >= limit:
+                break
+    return cast(list[T] | list[ModelT], result)
 
 
 def get_smtp_address(user: OlAddressEntry) -> LowerStr:
     """Returns the SMTP email address of the address entry.
-
     Args:
         user (OlAddressEntry): The address entry object.
-
     Returns:
         LowerStr: The SMTP email address.
-
     Notes:
         - For Exchange users, it attempts to get the primary SMTP address.
         - For non-Exchange users, it tries to retrieve the SMTP address via PropertyAccessor.
@@ -150,11 +77,12 @@ def get_smtp_address(user: OlAddressEntry) -> LowerStr:
     try:
         if not user:
             return ""
-
-        exch_user = user.GetExchangeUser()
+        try:
+            exch_user = user.GetExchangeUser()
+        except Exception:
+            exch_user = None
         if exch_user:
             return str(exch_user.PrimarySmtpAddress).lower()
-
         try:
             address = user.PropertyAccessor.GetProperty(SMTP_ADDRESS_SCHEMA)
             return str(address).lower()
@@ -162,10 +90,3 @@ def get_smtp_address(user: OlAddressEntry) -> LowerStr:
             return str(user.Address).lower()
     except Exception:
         return ""
-
-
-def is_builtin_class(obj) -> bool:
-    try:
-        return type(obj).__module__ == "builtins"
-    except Exception:
-        return False

@@ -1,11 +1,10 @@
 from __future__ import annotations
-
 from collections.abc import Iterable
-
+from functools import cached_property
 from ..enums import ItemType
 from ..protocols import OlAccount, OlStore
 from .folder import Folder
-from .node import ItemModel
+from .base import ItemModel
 
 
 class Account(ItemModel):
@@ -18,22 +17,22 @@ class Account(ItemModel):
     def __init__(self, ol_acct_item: OlAccount) -> None:
         """Initialize Account with an Outlook account item."""
         super().__init__(ol_acct_item)
-        self._ol_account_item = ol_acct_item
+        self.ol_item = ol_acct_item
 
-    @property
+    @cached_property
     def name(self) -> str:
         """Return the display name of the account."""
-        return self._ol_account_item.DisplayName
+        return self.ol_item.DisplayName
 
-    @property
+    @cached_property
     def email_address(self) -> str:
         """Return the email address of the account."""
-        return self._ol_account_item.SmtpAddress
+        return self.ol_item.SmtpAddress
 
-    @property
+    @cached_property
     def store(self) -> OlStore:
         """Return the default store associated with this account."""
-        return self._ol_account_item.DeliveryStore
+        return self.ol_item.DeliveryStore
 
     @property
     def root_folder(self) -> Folder | None:
@@ -47,30 +46,20 @@ class Account(ItemModel):
             return []
         return root.subfolders
 
-    def get_folder(self, folder_name: str) -> Folder | None:
-        """Return a folder by its name."""
-        if not isinstance(folder_name, str):
-            raise ValueError("folder_name must be a string")
-        target: str = folder_name.lower()
-        for folder in self.folders:
-            if (folder.name or "").lower() == target:
-                return folder
-        return None
-
     def find_folder(self, path: str | Iterable[str]) -> Folder | None:
         """Find a folder by path or iterable of folder names."""
-
         parts: list[str]
-
         if isinstance(path, str):
             parts = [segment.strip() for segment in path.split("/") if segment.strip()]
         else:
             parts = [str(segment).strip() for segment in path if str(segment).strip()]
-
         if not parts:
             return None
-
-        current: Folder | None = self.get_folder(parts[0])
+        target = parts[0].lower()
+        current = next(
+            (folder for folder in self.folders if folder.name.lower() == target),
+            None,
+        )
         for segment in parts[1:]:
             if current is None:
                 return None

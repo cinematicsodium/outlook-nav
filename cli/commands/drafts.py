@@ -1,9 +1,6 @@
 from __future__ import annotations
-
 from pathlib import Path
-
 import typer
-
 from ..context import abort, create_client
 
 app = typer.Typer(
@@ -60,28 +57,23 @@ def create_draft(
 ) -> None:
     """Create a draft email, optionally display it, and optionally send it."""
     client = create_client(ctx)
-    message = client.create_email()
+    message = client.new_email()
     if message is None:
         abort("Unable to create a new Outlook message.")
-
     message.to = to
     message.subject = subject
     message.body = body
-
     if cc:
         message.cc = cc
     if bcc:
         message.bcc = bcc
     if attachment:
         message.add_attachments(attachment)
-
     if send:
         message.send()
         typer.secho("Message sent.", fg=typer.colors.GREEN)
         return
-
-    message.save_as_draft()
+    message.save()
     if display:
-        message.display()
-
+        message.show()
     typer.secho("Draft created.", fg=typer.colors.GREEN)

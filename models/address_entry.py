@@ -1,9 +1,8 @@
 from __future__ import annotations
-
 from ..enums import ItemType
 from ..protocols import OlAddressEntry
 from ..utils import get_smtp_address
-from .node import ItemModel
+from .base import ItemModel
 
 
 class AddressEntry(ItemModel):
@@ -33,7 +32,7 @@ class AddressEntry(ItemModel):
     @property
     def email_address(self) -> str:
         """Returns the email address of the address entry."""
-        if (address := get_smtp_address(self._ol_address_entry)):
+        if address := get_smtp_address(self._ol_address_entry):
             return address
         return self._ol_address_entry.Address or ""
 

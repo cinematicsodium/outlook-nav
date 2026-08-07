@@ -1,9 +1,7 @@
-from .address_user import AddressUserType
-from .default_folder import FolderType
+from .default_folder import FolderEnum
 from .item_type import ItemType
 
 __all__ = [
-    "AddressUserType",
-    "FolderType",
+    "FolderEnum",
     "ItemType",
 ]
