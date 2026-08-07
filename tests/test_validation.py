@@ -2,8 +2,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from _outlook import OutlookError
-from _outlook.validation import validate_datetime, validate_email, validate_paths
+from outlook import OutlookError
+from outlook.validation import validate_datetime, validate_email, validate_paths
 
 
 def test_email_lists_are_normalized_without_discarding_recipients() -> None:

@@ -1,18 +1,11 @@
-*.egg-info/
-*.py[cod]
-.DS_Store
-.coverage
-.env
-.idea/
-.ipynb_checkpoints/
-.json
-.log
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
-.venv/
-.vscode/
-__pycache__/
-build/
-dist/
-venv/
+# Track Python source; ignore everything else by default.
+*
+!*/
+!*.md
+!*.py
+!.gitignore
+
+# Add exceptions below as needed, for example:
+# !README.md
+# !pyproject.toml
+# !requirements*.txt

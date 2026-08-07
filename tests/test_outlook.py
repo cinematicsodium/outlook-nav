@@ -3,24 +3,24 @@ from types import SimpleNamespace
 import pytest
 from typer.testing import CliRunner
 
-import _outlook
-from _outlook import ItemType, Outlook, OutlookError
-from _outlook.cli.app import app
-from _outlook.services.outlook import _select_account
+import outlook
+from outlook import ItemType, Outlook, OutlookError
+from outlook.cli.app import app
+from outlook.services.outlook import _select_account
 
 from .test_model_navigation import FakeAccount, FakeCollection, FakeFolder
 
 
-def _accounts() -> list[_outlook.Account]:
+def _accounts() -> list[outlook.Account]:
     root = FakeFolder("Root")
     return [
-        _outlook.Account(FakeAccount("First", "first@example.com", root)),
-        _outlook.Account(FakeAccount("Second", "second@example.com", root)),
+        outlook.Account(FakeAccount("First", "first@example.com", root)),
+        outlook.Account(FakeAccount("Second", "second@example.com", root)),
     ]
 
 
 def test_public_package_and_cli_help_import_normally() -> None:
-    assert _outlook.Outlook is Outlook
+    assert outlook.Outlook is Outlook
     result = CliRunner().invoke(app, ["--help"])
     assert result.exit_code == 0
     assert "accounts" in result.stdout

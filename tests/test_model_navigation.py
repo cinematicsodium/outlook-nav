@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from _outlook import Account, DefaultFolders, Folder, FolderEnum, ItemType, MailItem
+from outlook import Account, DefaultFolders, Folder, FolderEnum, ItemType, MailItem
 
 
 class FakeCollection:
