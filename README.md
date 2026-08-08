@@ -6,10 +6,12 @@ This package is intended for environments where the Outlook desktop app is avail
 
 ## What the module provides
 
-- `OutlookApp`: connect to Outlook, resolve mailboxes, create messages, and work with folders. Supports context manager usage for automatic resource cleanup.
+- `Outlook`: connect to Outlook, resolve accounts, create messages, and work with folders. Supports context manager usage for automatic resource cleanup.
 - `Account`: inspect mailbox/account metadata and walk mailbox folder trees.
-- `Folder`: list messages (with optional limit and unread-only filters), browse and walk the subfolder tree, create or delete subfolders, and move or delete items.
-- `MailItem`: read and set message fields (including HTML body and unread flag), update multiple fields at once, attach files, save, display, send, move, or delete messages.
+- `Folder`: list messages (with optional limit and unread-only filters), browse and walk the subfolder tree, create or delete subfolders, and move or delete items. Supports iteration via `for message in folder`.
+- `FolderListing`: a dataclass representing a single entry in a folder tree walk, with `path`, `depth`, and `subfolder_count` fields and an `as_row()` helper.
+- `MailItem`: read and set message fields (including HTML body and unread flag), update multiple fields at once, attach files, save, show, send, move, export, or delete messages.
+- `AddressEntry`: a model representing an Outlook address book entry, exposing `name`, `email_address`, and `user_type`.
 - `Account.default_folder()`: resolve default folders such as Inbox, Drafts, Sent Mail, and Junk for a specific account.
 - Exception classes: `OutlookError`, `OutlookConnectionError`, `OutlookValidationError`, `EmailValidationError`, and `PathValidationError` for structured error handling.
 
@@ -24,32 +26,29 @@ This package is intended for environments where the Outlook desktop app is avail
 ### Connect to Outlook
 
 ```python
-from outlook import OutlookApp
+from outlook import Outlook
 
-app = OutlookApp()
-print(app.list_mailboxes())
+app = Outlook()
+print(app.accounts)
 ```
 
 If you want to target a specific sending account, pass the mailbox SMTP address:
 
 ```python
-from outlook import OutlookApp
+from outlook import Outlook
 
-app = OutlookApp(mailbox_address="me@company.com")
-print(app.mailbox_account)
+app = Outlook(address="me@company.com")
+print(app.account)
 ```
 
-You can also use the `connect()` classmethod, or manage the connection with a context manager so COM resources are released automatically:
+You can manage the connection with a context manager so COM resources are released automatically:
 
 ```python
-from outlook import OutlookApp
-
-# classmethod — equivalent to OutlookApp() without a mailbox address
-app = OutlookApp.connect()
+from outlook import Outlook
 
 # context manager — calls app.close() on exit
-with OutlookApp(mailbox_address="me@company.com") as app:
-    print(app.list_mailboxes())
+with Outlook(address="me@company.com") as app:
+    print(app.accounts)
 ```
 
 ### Read messages from the Inbox
@@ -68,89 +67,129 @@ if inbox:
     # show only unread messages
     for message in inbox.list_messages(unread_only=True):
         print(message.subject, message.unread)
+
+    # folders also support direct iteration
+    for message in inbox:
+        print(message.subject)
 ```
 
 ### Find a folder by path inside a mailbox
 
 ```python
-from outlook import OutlookApp
+from outlook import Outlook
 
-app = OutlookApp(mailbox_address="me@company.com")
-account = app.mailbox_account
+app = Outlook(address="me@company.com")
+account = app.account
 
 if account:
     reports = account.find_folder("Inbox/Reports")
     print(reports)
 ```
 
+### Walk and navigate the folder tree
+
+```python
+from outlook import Outlook
+
+app = Outlook(address="me@company.com")
+account = app.account
+
+if account:
+    inbox = account.find_folder("Inbox")
+    if inbox:
+        # walk the tree up to 3 levels deep
+        for entry in inbox.walk(recursive=True, max_depth=3):
+            print(entry.path, entry.depth, entry.subfolder_count)
+
+        # get a direct child subfolder by name
+        reports = inbox.get_subfolder("Reports")
+
+        # create a new subfolder
+        archive = inbox.create_subfolder("Archive")
+
+        # delete a subfolder by name
+        inbox.delete_subfolder("OldFolder")
+```
+
 ### Create and save a draft
 
 ```python
-from outlook import OutlookApp
+from outlook import Outlook
 
-app = OutlookApp(mailbox_address="me@company.com")
-message = app.create_email()
+app = Outlook(address="me@company.com")
+message = app.new_email()
 
-if message:
-    message.to = ["alice@company.com", "bob@company.com"]
-    message.cc = "manager@company.com"
-    message.bcc = "archive@company.com"
-    message.subject = "Weekly status"
-    message.body = "Attached is the latest update."
-    message.add_attachments("~/Documents/status.xlsx")
-    message.save_as_draft()
+message.to = ["alice@company.com", "bob@company.com"]
+message.cc = "manager@company.com"
+message.bcc = "archive@company.com"
+message.subject = "Weekly status"
+message.body = "Attached is the latest update."
+message.add_attachments("~/Documents/status.xlsx")
+message.save()
 ```
 
-You can also set an HTML body instead of plain text:
+You can also set an HTML body instead of plain text using the `html` property:
 
 ```python
-if message:
-    message.html_body = "<html><body><p>Hello from Python.</p></body></html>"
-    message.save_as_draft()
+message.html = "<html><body><p>Hello from Python.</p></body></html>"
+message.save()
 ```
 
 To update several fields at once and save in one call, use `update()`:
 
 ```python
-if message:
-    message.update(subject="Updated subject", body="New body text", is_unread=False)
+message.update(subject="Updated subject", body="New body text", unread=False)
 ```
 
 ### Display or send a message
 
 ```python
-from outlook import OutlookApp
+from outlook import Outlook
 
-app = OutlookApp(mailbox_address="me@company.com")
-message = app.create_email()
+app = Outlook(address="me@company.com")
+message = app.new_email()
 
-if message:
-    message.to = "alice@company.com"
-    message.subject = "Hello"
-    message.body = "This was created from Python."
+message.to = "alice@company.com"
+message.subject = "Hello"
+message.body = "This was created from Python."
 
-    # Open the compose window
-    message.display()
+# Open the compose window
+message.show()
 
-    # Or send immediately
-    # message.send()
+# Or send immediately
+# message.send()
 ```
 
 ### Move a message to another folder
 
 ```python
-from outlook import OutlookApp
+from outlook import Outlook
 
-app = OutlookApp(mailbox_address="me@company.com")
-account = app.mailbox_account
+app = Outlook(address="me@company.com")
+account = app.account
 
 if account:
     inbox = account.find_folder("Inbox")
     archive = account.find_folder("Inbox/Archive")
 
     if inbox and archive and inbox.mail_items:
-        moved = inbox.mail_items[0].move_to(archive)
+        moved = inbox.mail_items[0].move(archive)
         print(moved)
+```
+
+### Export (save) a message to disk
+
+```python
+from outlook import Outlook
+from outlook.enums import FolderEnum
+
+app = Outlook()
+inbox = app.account.default_folder(FolderEnum.INBOX) if app.account else None
+
+if inbox and inbox.mail_items:
+    message = inbox.mail_items[0]
+    success = message.export("~/exports/message.msg")
+    print("Saved" if success else "Failed")
 ```
 
 ### Inspect a message as a dictionary or table
@@ -168,6 +207,46 @@ if inbox and inbox.mail_items:
     print(message.as_table())
 ```
 
+### Inspect sender and recipients
+
+```python
+from outlook import Outlook
+from outlook.enums import FolderEnum
+
+app = Outlook()
+inbox = app.account.default_folder(FolderEnum.INBOX) if app.account else None
+
+if inbox and inbox.mail_items:
+    message = inbox.mail_items[0]
+
+    # AddressEntry for the sender (name, email_address, user_type)
+    sender = message.sender_entry
+    if sender:
+        print(sender.name, sender.email_address)
+
+    # Detailed list of all recipients
+    for recipient in message.recipients:
+        print(recipient["name"], recipient["address"])
+```
+
+### Thread and size properties
+
+```python
+if inbox and inbox.mail_items:
+    message = inbox.mail_items[0]
+
+    # conversation threading
+    print(message.thread_id)
+    print(message.thread_index)
+
+    # size in bytes and megabytes
+    print(message.size)
+    print(message.size_mb)
+
+    # parent folder of this message
+    print(message.folder)
+```
+
 ## CLI examples
 
 Run the package as a module:
@@ -179,25 +258,25 @@ python -m outlook --help
 Use `--verbose` / `-v` to enable detailed debug logging for any command:
 
 ```bash
-python -m outlook --verbose mailboxes list
+python -m outlook --verbose accounts list
 ```
 
-List visible mailboxes:
+List visible accounts:
 
 ```bash
-python -m outlook mailboxes list
+python -m outlook accounts list
 ```
 
-List folders for a mailbox:
+List folders for an account:
 
 ```bash
-python -m outlook --mailbox "me@company.com" folders list --recursive --max-depth 2
+python -m outlook --account "me@company.com" folders list --recursive --max-depth 2
 ```
 
 List folders starting from a specific subfolder:
 
 ```bash
-python -m outlook --mailbox "me@company.com" folders list --root "Inbox/Reports" --recursive --max-depth 3
+python -m outlook --account "me@company.com" folders list --root "Inbox/Reports" --recursive --max-depth 3
 ```
 
 List recent Inbox messages:
@@ -239,6 +318,6 @@ python -m outlook drafts create \
 
 - Email address inputs are validated before being written to Outlook fields.
 - Attachment paths must exist on disk.
-- When multiple mailboxes are available, mailbox-specific folder lookups work best when you set `mailbox_address` or pass `--mailbox` in the CLI.
-- Use `OutlookApp` as a context manager (`with OutlookApp(...) as app:`) or call `app.close()` explicitly to release COM resources when you are done.
+- When multiple accounts are available, account-specific folder lookups work best when you set `address` or pass `--account` in the CLI.
+- Use `Outlook` as a context manager (`with Outlook(...) as app:`) or call `app.close()` explicitly to release COM resources when you are done.
 - The package exports exception classes (`OutlookConnectionError`, `EmailValidationError`, `PathValidationError`, and others) that you can import and catch for structured error handling.
