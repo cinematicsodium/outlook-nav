@@ -1,12 +1,14 @@
 from __future__ import annotations
+
 import logging
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypedDict
+
 from ..enums import ItemType
 from ..protocols import OlMailItem
-from ..type_defs import StrPath
+from ..types import StrPath
 from ..utils import get_smtp_address, unpack_collection
 from ..validation import validate_datetime, validate_email, validate_paths
 from .address_entry import AddressEntry

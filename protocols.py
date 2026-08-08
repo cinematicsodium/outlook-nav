@@ -1,6 +1,6 @@
-from typing import Any, Protocol, TypeAlias, TypeVar
+from typing import Any, Protocol, TypeAlias
 
-T = TypeVar("T", covariant=True)
+from .types import T
 
 
 class OlCollection(Protocol[T]):
@@ -17,15 +17,3 @@ OlMailItem: TypeAlias = Any
 OlNamespace: TypeAlias = Any
 OlObject: TypeAlias = Any
 OlStore: TypeAlias = Any
-
-__all__ = [
-    "OlAccount",
-    "OlAddressEntry",
-    "OlApplication",
-    "OlCollection",
-    "OlFolder",
-    "OlMailItem",
-    "OlNamespace",
-    "OlObject",
-    "OlStore",
-]

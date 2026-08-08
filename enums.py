@@ -10,8 +10,19 @@ class FolderEnum(IntEnum):
     CONTACTS = 10
     JOURNAL = 11
     NOTES = 12
+    DRAFTS = 16
     CONFLICTS = 19
     LOCAL_FAILURES = 21
     JUNK = 23
     ARCHIVED_MAIL = 29
-    DRAFTS = 16
+
+
+class ItemType(IntEnum):
+    """Outlook object classes used by this package."""
+
+    NAMESPACE = 1
+    FOLDER = 2
+    ADDRESS_ENTRY = 8
+    MAIL_ITEM = 43
+    ACCOUNT = 105
+    STORE = 107

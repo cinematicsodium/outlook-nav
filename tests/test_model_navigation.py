@@ -5,7 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from outlook import Account, DefaultFolders, Folder, FolderEnum, ItemType, MailItem
+from outlook import Account, Folder, MailItem
+from outlook.enums import FolderEnum, ItemType
 
 
 class FakeCollection:
@@ -91,22 +92,23 @@ class FakeAccount:
     def __init__(self, name: str, address: str, root: FakeFolder) -> None:
         self.DisplayName = name
         self.SmtpAddress = address
-        self.DeliveryStore = SimpleNamespace(GetRootFolder=lambda: root)
+        self.DeliveryStore = FakeStore(root)
 
 
-class FakeNamespace:
-    Class = ItemType.NAMESPACE
-
+class FakeStore:
     def __init__(self, folder: FakeFolder) -> None:
         self.folder = folder
         self.calls = 0
+
+    def GetRootFolder(self) -> FakeFolder:
+        return self.folder
 
     def GetDefaultFolder(self, folder_type: FolderEnum) -> FakeFolder:
         self.calls += 1
         return self.folder
 
 
-class FlakyNamespace(FakeNamespace):
+class FlakyStore(FakeStore):
     def GetDefaultFolder(self, folder_type: FolderEnum) -> FakeFolder:
         if self.calls == 0:
             self.calls += 1
@@ -174,22 +176,25 @@ def test_get_item_uses_one_direct_com_lookup() -> None:
     assert collection.item_calls == 1
 
 
-def test_default_folder_cache_is_case_insensitive() -> None:
-    namespace = FakeNamespace(FakeFolder("Inbox"))
-    folders = DefaultFolders(namespace)
+def test_account_default_folder_is_cached() -> None:
+    raw_account = FakeAccount("Primary", "user@example.com", FakeFolder("Inbox"))
+    account = Account(raw_account)
 
-    assert folders.get(FolderEnum.INBOX) is folders.get(" Inbox ")
-    assert namespace.calls == 1
+    assert account.default_folder(FolderEnum.INBOX) is account.default_folder(
+        FolderEnum.INBOX
+    )
+    assert raw_account.DeliveryStore.calls == 1
 
 
-def test_default_folder_failure_is_not_cached() -> None:
-    namespace = FlakyNamespace(FakeFolder("Inbox"))
-    folders = DefaultFolders(namespace)
+def test_account_default_folder_failure_is_not_cached() -> None:
+    raw_account = FakeAccount("Primary", "user@example.com", FakeFolder("Inbox"))
+    raw_account.DeliveryStore = FlakyStore(FakeFolder("Inbox"))
+    account = Account(raw_account)
 
     with pytest.raises(RuntimeError):
-        folders.get("inbox")
-    assert folders.get("inbox") is not None
-    assert namespace.calls == 2
+        account.default_folder(FolderEnum.INBOX)
+    assert account.default_folder(FolderEnum.INBOX) is not None
+    assert raw_account.DeliveryStore.calls == 2
 
 
 def test_folder_walk_honors_max_depth() -> None:

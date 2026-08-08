@@ -5,7 +5,7 @@ from typing import Callable, cast, overload
 
 from .constants import _UNSET, SMTP_ADDRESS_SCHEMA
 from .protocols import OlAddressEntry, OlCollection, OlObject
-from .type_defs import LowerStr, ModelT, RawT, T
+from .types import LowerStr, ModelT, RawT, T
 
 
 def is_accessible_ol_item(

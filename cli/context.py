@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import NoReturn
+
 import typer
+
 from ..enums import FolderEnum
 from ..exceptions import OutlookError
 from ..models.account import Account
@@ -87,14 +90,13 @@ def resolve_folder(
     normalized_path = folder_path.strip()
     if not normalized_path:
         abort("Folder path cannot be empty.")
-    selected_account = account or get_state(ctx).account
     resolved_account = resolve_account(client, ctx, account=account)
     folder = resolved_account.find_folder(normalized_path)
     if folder is not None:
         return folder
     folder_enum = DEFAULT_FOLDERS.get(normalized_path.lower())
-    if folder_enum is not None and not selected_account:
-        default_folder = client.defaults.get(folder_enum)
+    if folder_enum is not None:
+        default_folder = resolved_account.default_folder(folder_enum)
         if default_folder is not None:
             return default_folder
     abort(f"Folder not found in account '{resolved_account.name}': {normalized_path}")

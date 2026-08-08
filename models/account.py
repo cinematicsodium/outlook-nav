@@ -1,10 +1,12 @@
 from __future__ import annotations
+
 from collections.abc import Iterable
 from functools import cached_property
-from ..enums import ItemType
+
+from ..enums import FolderEnum, ItemType
 from ..protocols import OlAccount, OlStore
-from .folder import Folder
 from .base import ItemModel
+from .folder import Folder
 
 
 class Account(ItemModel):
@@ -18,6 +20,7 @@ class Account(ItemModel):
         """Initialize Account with an Outlook account item."""
         super().__init__(ol_acct_item)
         self.ol_item = ol_acct_item
+        self._default_folders: dict[FolderEnum, Folder] = {}
 
     @cached_property
     def name(self) -> str:
@@ -45,6 +48,14 @@ class Account(ItemModel):
         if (root := self.root_folder) is None:
             return []
         return root.subfolders
+
+    def default_folder(self, folder: FolderEnum) -> Folder | None:
+        """Return one of this account's default folders."""
+        if folder not in self._default_folders:
+            resolved = Folder.from_outlook_item(self.store.GetDefaultFolder(folder))
+            if resolved is not None:
+                self._default_folders[folder] = resolved
+        return self._default_folders.get(folder)
 
     def find_folder(self, path: str | Iterable[str]) -> Folder | None:
         """Find a folder by path or iterable of folder names."""

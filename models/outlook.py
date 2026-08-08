@@ -1,13 +1,14 @@
 from __future__ import annotations
+
 import logging
 from functools import cached_property
 from types import TracebackType
+
 from ..exceptions import OutlookError
 from ..protocols import OlApplication, OlMailItem, OlNamespace
-from ..services.outlook import _connect, _open_mapi, _select_account
+from ..services.client import _connect, _open_mapi, _select_account
 from ..utils import unpack_collection
 from .account import Account
-from .default_folders import DefaultFolders
 from .mail_item import MailItem
 
 logger = logging.getLogger(__name__)
@@ -42,14 +43,6 @@ class Outlook:
         traceback: TracebackType | None,
     ) -> None:
         self.close()
-
-    @cached_property
-    def defaults(self) -> DefaultFolders:
-        """Return Outlook's defaults."""
-        folders = DefaultFolders.from_outlook_item(self._require_mapi())
-        if folders is None:
-            raise OutlookError("Unable to initialize Outlook default folders.")
-        return folders
 
     @cached_property
     def accounts(self) -> list[Account]:
@@ -90,8 +83,7 @@ class Outlook:
 
     def close(self) -> None:
         """Release held COM references without closing the Outlook process."""
-        for name in ("defaults", "accounts"):
-            self.__dict__.pop(name, None)
+        self.__dict__.pop("accounts", None)
         self.account = None
         self.address = None
         self._mapi = None

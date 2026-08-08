@@ -4,11 +4,12 @@ import pytest
 from typer.testing import CliRunner
 
 import outlook
-from outlook import ItemType, Outlook, OutlookError
+from outlook import Outlook, OutlookError
 from outlook.cli.app import app
-from outlook.services.outlook import _select_account
+from outlook.enums import ItemType
+from outlook.services.client import _select_account
 
-from .test_model_navigation import FakeAccount, FakeCollection, FakeFolder
+from outlook.tests.test_model_navigation import FakeAccount, FakeCollection, FakeFolder
 
 
 def _accounts() -> list[outlook.Account]:
@@ -50,4 +51,4 @@ def test_close_releases_cached_com_wrappers() -> None:
     assert client.account is None
     assert "accounts" not in client.__dict__
     with pytest.raises(OutlookError):
-        _ = client.defaults
+        _ = client.accounts

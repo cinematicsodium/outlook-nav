@@ -10,7 +10,7 @@ This package is intended for environments where the Outlook desktop app is avail
 - `Account`: inspect mailbox/account metadata and walk mailbox folder trees.
 - `Folder`: list messages (with optional limit and unread-only filters), browse and walk the subfolder tree, create or delete subfolders, and move or delete items.
 - `MailItem`: read and set message fields (including HTML body and unread flag), update multiple fields at once, attach files, save, display, send, move, or delete messages.
-- `DefaultFolders`: convenient access to default folders including Inbox, Drafts, Sent Mail, Junk, Deleted Items, Outbox, Calendar, Contacts, Journal, Notes, Conflicts, and Local Failures.
+- `Account.default_folder()`: resolve default folders such as Inbox, Drafts, Sent Mail, and Junk for a specific account.
 - Exception classes: `OutlookError`, `OutlookConnectionError`, `OutlookValidationError`, `EmailValidationError`, and `PathValidationError` for structured error handling.
 
 ## Requirements
@@ -55,18 +55,19 @@ with OutlookApp(mailbox_address="me@company.com") as app:
 ### Read messages from the Inbox
 
 ```python
-from outlook import OutlookApp
+from outlook import Outlook
+from outlook.enums import FolderEnum
 
-app = OutlookApp()
-inbox = app.default_folders.inbox
+app = Outlook()
+inbox = app.account.default_folder(FolderEnum.INBOX) if app.account else None
 
 if inbox:
     for message in inbox.list_messages(limit=10):
-        print(message.received_time, message.sender_address, message.subject)
+        print(message.received_at, message.sender_address, message.subject)
 
     # show only unread messages
     for message in inbox.list_messages(unread_only=True):
-        print(message.subject, message.is_unread)
+        print(message.subject, message.unread)
 ```
 
 ### Find a folder by path inside a mailbox
@@ -155,10 +156,11 @@ if account:
 ### Inspect a message as a dictionary or table
 
 ```python
-from outlook import OutlookApp
+from outlook import Outlook
+from outlook.enums import FolderEnum
 
-app = OutlookApp()
-inbox = app.default_folders.inbox
+app = Outlook()
+inbox = app.account.default_folder(FolderEnum.INBOX) if app.account else None
 
 if inbox and inbox.mail_items:
     message = inbox.mail_items[0]
