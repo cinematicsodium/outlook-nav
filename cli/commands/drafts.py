@@ -41,7 +41,7 @@ def create_draft(
         "--bcc",
         help="Optional BCC recipients separated by commas or semicolons.",
     ),
-    attachment: list[Path] | None = typer.Option(
+    attachment: list[Path] | None = typer.Option(  # ruff: ignore[B008]
         None,
         "--attachment",
         "-a",

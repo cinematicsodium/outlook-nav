@@ -49,7 +49,7 @@ class Outlook:
 
     __str__ = __repr__
 
-    def __enter__(self) -> Outlook:
+    def __enter__(self) -> Outlook:  # ruff: ignore[PYI034]
         return self
 
     def __exit__(

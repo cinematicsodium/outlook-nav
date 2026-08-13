@@ -106,7 +106,7 @@ class Folder(ItemModel):
         if callable(sort):
             try:
                 sort("[ReceivedTime]", True)
-            except Exception:
+            except Exception:  # ruff: ignore[BLE001]
                 logger.debug("Unable to sort messages in '%s'", self.name)
         if unread_only:
             restrict = getattr(items, "Restrict", None)
@@ -114,7 +114,7 @@ class Folder(ItemModel):
                 try:
                     items = restrict("[UnRead] = True")
                     unread_only = False
-                except Exception:
+                except Exception:  # ruff: ignore[BLE001]
                     logger.debug("Unable to filter unread messages in '%s'", self.name)
         return unpack_collection(
             items,  # type: ignore
@@ -132,7 +132,7 @@ class Folder(ItemModel):
                 self._ol_folder_item.Folders, transformer=Folder
             )
             yield from subfolders
-        except Exception:
+        except Exception:  # ruff: ignore[BLE001]
             logger.warning("Unable to enumerate subfolders for '%s'", self.name)
             return
 
@@ -230,7 +230,7 @@ class Folder(ItemModel):
             If ``folder_name`` is not a string.
         """
         if not isinstance(folder_name, str):
-            raise ValueError("folder_name must be a string")
+            raise ValueError("folder_name must be a string")  # ruff: ignore[TRY004]
         normalized_folder_name: str = folder_name.lower()
         for folder in self.subfolders:
             if (folder.name or "").lower() == normalized_folder_name:
@@ -258,7 +258,7 @@ class Folder(ItemModel):
             If the folder has no child-folder collection.
         """
         if not isinstance(folder_name, str):
-            raise ValueError("folder_name must be a string")
+            raise ValueError("folder_name must be a string")  # ruff: ignore[TRY004]
         if not folder_name.strip():
             raise ValueError("folder_name cannot be empty")
         folders = self._ol_folder_item.Folders
@@ -306,9 +306,9 @@ class Folder(ItemModel):
             If either argument has the wrong model type.
         """
         if not isinstance(mail_item, MailItem):
-            raise ValueError("mail_item must be a MailItem")
+            raise ValueError("mail_item must be a MailItem")  # ruff: ignore[TRY004]
         if not isinstance(destination, Folder):
-            raise ValueError("destination must be a Folder")
+            raise ValueError("destination must be a Folder")  # ruff: ignore[TRY004]
         return mail_item.move(destination)
 
     def delete_item(self, mail_item: MailItem) -> None:
@@ -325,7 +325,7 @@ class Folder(ItemModel):
             If ``mail_item`` is not a :class:`MailItem`.
         """
         if not isinstance(mail_item, MailItem):
-            raise ValueError("mail_item must be a MailItem")
+            raise ValueError("mail_item must be a MailItem")  # ruff: ignore[TRY004]
         mail_item.delete()
 
     def delete(self) -> None:

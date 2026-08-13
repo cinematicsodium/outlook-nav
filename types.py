@@ -6,6 +6,6 @@ if TYPE_CHECKING:
 
 LowerStr: TypeAlias = str
 StrPath: TypeAlias = str | Path
-T = TypeVar("T", covariant=True)
+T = TypeVar("T", covariant=True)  # ruff: ignore[PLC0105]
 ModelT = TypeVar("ModelT", bound="ItemModel")
 RawT = TypeVar("RawT")

@@ -39,7 +39,7 @@ def format_datetime(value: datetime | None) -> str:
         return ""
     try:
         return value.strftime("%Y-%m-%d %H:%M")
-    except Exception:
+    except Exception:  # ruff: ignore[BLE001]
         return str(value)
 
 

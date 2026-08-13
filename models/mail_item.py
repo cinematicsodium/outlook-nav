@@ -445,7 +445,7 @@ class MailItem(ItemModel):
         if value is None:
             return ""
         try:
-            return "" if abs(value.year - datetime.now().year) >= 100 else str(value)
+            return "" if abs(value.year - datetime.now().year) >= 100 else str(value)  # ruff: ignore[DTZ005]
         except (AttributeError, OverflowError, ValueError):
             return ""
 
