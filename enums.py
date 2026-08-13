@@ -2,6 +2,8 @@ from enum import IntEnum
 
 
 class FolderEnum(IntEnum):
+    """Identifiers for Outlook's built-in default folders."""
+
     DELETED_ITEMS = 3
     OUTBOX = 4
     SENT_MAIL = 5

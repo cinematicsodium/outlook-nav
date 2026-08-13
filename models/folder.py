@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
+
 from ..enums import ItemType
 from ..protocols import OlFolder
 from ..utils import unpack_collection
@@ -14,25 +16,41 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class FolderListing:
-    """Serializable folder tree entry for CLI and reporting."""
+    """Represent a folder in a tree listing.
+
+    Parameters
+    ----------
+    path : str
+        Slash-delimited folder path.
+    depth : int
+        Depth relative to the walk root.
+    subfolder_count : int
+        Number of direct child folders.
+    """
 
     path: str
     depth: int
     subfolder_count: int
 
     def as_row(self) -> tuple[object, ...]:
+        """Return the listing fields as a table row."""
         return (self.path, self.depth, self.subfolder_count)
 
 
 class Folder(ItemModel):
-    """Represents an Outlook folder."""
+    """Represent an Outlook folder.
+
+    Parameters
+    ----------
+    item : OlFolder
+        Outlook folder COM object to wrap.
+    """
 
     item_type = ItemType.FOLDER
     required_properties = ("Name", "Items", "Folders")
     inaccessible_error_message = "Provided Outlook item is not an accessible folder."
 
     def __init__(self, item: OlFolder) -> None:
-        """Initialize Folder with an Outlook item."""
         super().__init__(item)
         self._ol_folder_item = item
 
@@ -43,6 +61,7 @@ class Folder(ItemModel):
 
     @cached_property
     def folder_path(self) -> str:
+        """Return the full Outlook folder path."""
         return self._ol_folder_item.FolderPath
 
     @property
@@ -60,7 +79,26 @@ class Folder(ItemModel):
         limit: int | None = None,
         unread_only: bool = False,
     ) -> list[MailItem]:
-        """Return mail items from this folder with optional filtering."""
+        """Return messages from the folder.
+
+        Parameters
+        ----------
+        limit : int, optional
+            Maximum number of messages to return.
+        unread_only : bool, default=False
+            Return only unread messages.
+
+        Returns
+        -------
+        list of MailItem
+            Accessible messages ordered by received time when Outlook supports
+            sorting.
+
+        Raises
+        ------
+        ValueError
+            If ``limit`` is less than one.
+        """
         if limit is not None and limit < 1:
             raise ValueError("limit must be >= 1")
         items = self._ol_folder_item.Items
@@ -105,7 +143,29 @@ class Folder(ItemModel):
         depth: int = 0,
         parent_path: str = "",
     ) -> list[FolderListing]:
-        """Return folder tree entries rooted at this folder."""
+        """Return folder tree entries rooted at this folder.
+
+        Parameters
+        ----------
+        recursive : bool, default=False
+            Include descendant folders.
+        max_depth : int, default=0
+            Maximum descendant depth when walking recursively.
+        depth : int, default=0
+            Depth assigned to this folder.
+        parent_path : str, default=""
+            Path prepended to this folder's name.
+
+        Returns
+        -------
+        list of FolderListing
+            Folder entries in depth-first order.
+
+        Raises
+        ------
+        ValueError
+            If ``max_depth`` is negative for a recursive walk.
+        """
         if recursive and max_depth < 0:
             raise ValueError("max_depth must be >= 0")
         path = f"{parent_path}/{self.name}" if parent_path else self.name
@@ -127,7 +187,23 @@ class Folder(ItemModel):
         return folder_listing_entries
 
     def get_item(self, index: int) -> MailItem | None:
-        """Get MailItem at the specified index."""
+        """Return a message by zero-based index.
+
+        Parameters
+        ----------
+        index : int
+            Zero-based message index.
+
+        Returns
+        -------
+        MailItem or None
+            The accessible message, or ``None`` when the index is out of range.
+
+        Raises
+        ------
+        ValueError
+            If ``index`` is negative.
+        """
         if index < 0:
             raise ValueError("index must be >= 0")
         items = self._ol_folder_item.Items
@@ -136,7 +212,23 @@ class Folder(ItemModel):
         return MailItem.from_outlook_item(items.Item(index + 1))
 
     def get_subfolder(self, folder_name: str) -> Folder | None:
-        """Get subfolder by name."""
+        """Return a direct child folder by name.
+
+        Parameters
+        ----------
+        folder_name : str
+            Case-insensitive folder name.
+
+        Returns
+        -------
+        Folder or None
+            The matching child folder, if present.
+
+        Raises
+        ------
+        ValueError
+            If ``folder_name`` is not a string.
+        """
         if not isinstance(folder_name, str):
             raise ValueError("folder_name must be a string")
         normalized_folder_name: str = folder_name.lower()
@@ -146,7 +238,25 @@ class Folder(ItemModel):
         return None
 
     def create_subfolder(self, folder_name: str) -> Folder | None:
-        """Create a new subfolder with the given name."""
+        """Create a direct child folder.
+
+        Parameters
+        ----------
+        folder_name : str
+            Name of the new folder.
+
+        Returns
+        -------
+        Folder or None
+            The new folder, if Outlook returns an accessible object.
+
+        Raises
+        ------
+        ValueError
+            If ``folder_name`` is not a nonempty string.
+        AttributeError
+            If the folder has no child-folder collection.
+        """
         if not isinstance(folder_name, str):
             raise ValueError("folder_name must be a string")
         if not folder_name.strip():
@@ -157,7 +267,18 @@ class Folder(ItemModel):
         return Folder(folders.Add(folder_name))
 
     def delete_subfolder(self, folder_name: str) -> bool:
-        """Delete a subfolder by name."""
+        """Delete a direct child folder by name.
+
+        Parameters
+        ----------
+        folder_name : str
+            Case-insensitive folder name.
+
+        Returns
+        -------
+        bool
+            ``True`` when a matching folder was deleted.
+        """
         folder: Folder | None = self.get_subfolder(folder_name)
         if folder is None:
             return False
@@ -165,7 +286,25 @@ class Folder(ItemModel):
         return True
 
     def move_item(self, mail_item: MailItem, destination: Folder) -> MailItem | None:
-        """Move a MailItem to another Folder."""
+        """Move a message to another folder.
+
+        Parameters
+        ----------
+        mail_item : MailItem
+            Message to move.
+        destination : Folder
+            Destination folder.
+
+        Returns
+        -------
+        MailItem or None
+            The moved message, if Outlook returns an accessible object.
+
+        Raises
+        ------
+        ValueError
+            If either argument has the wrong model type.
+        """
         if not isinstance(mail_item, MailItem):
             raise ValueError("mail_item must be a MailItem")
         if not isinstance(destination, Folder):
@@ -173,7 +312,18 @@ class Folder(ItemModel):
         return mail_item.move(destination)
 
     def delete_item(self, mail_item: MailItem) -> None:
-        """Delete a MailItem from the folder."""
+        """Delete a message from the folder.
+
+        Parameters
+        ----------
+        mail_item : MailItem
+            Message to delete.
+
+        Raises
+        ------
+        ValueError
+            If ``mail_item`` is not a :class:`MailItem`.
+        """
         if not isinstance(mail_item, MailItem):
             raise ValueError("mail_item must be a MailItem")
         mail_item.delete()

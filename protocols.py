@@ -4,6 +4,8 @@ from .types import T
 
 
 class OlCollection(Protocol[T]):
+    """Structural type for a one-indexed Outlook COM collection."""
+
     Count: int
 
     def Item(self, index: int, /) -> T: ...

@@ -20,11 +20,21 @@ if TYPE_CHECKING:
 
 
 class Recipient(TypedDict):
+    """Name and SMTP address for a message recipient."""
+
     name: str
     address: str
 
 
 class MailItem(ItemModel):
+    """Represent an Outlook email message.
+
+    Parameters
+    ----------
+    item : OlMailItem
+        Outlook mail item COM object to wrap.
+    """
+
     _UPDATABLE_FIELDS = frozenset(
         {
             "sent_for",
@@ -138,11 +148,12 @@ class MailItem(ItemModel):
 
     @property
     def delivery_recipients(self):
+        """Return the To, CC, and BCC recipient strings."""
         return self.to, self.cc, self.bcc
 
     @property
     def recipients(self) -> list[Recipient]:
-        """Returns a list of RecipientInfo dictionaries for all recipients of the email."""
+        """Return names and SMTP addresses for all resolved recipients."""
         entries = (
             AddressEntry.from_outlook_item(recipient.AddressEntry)
             for recipient in unpack_collection(self._item.Recipients)
@@ -195,7 +206,18 @@ class MailItem(ItemModel):
         ]
 
     def add_attachments(self, paths: str | Path | Iterable[str | Path]) -> None:
-        """Attaches one or more files to the email item."""
+        """Attach one or more files to the message.
+
+        Parameters
+        ----------
+        paths : str, Path, or iterable of str or Path
+            Existing files to attach.
+
+        Raises
+        ------
+        OutlookError
+            If any supplied path is invalid or does not exist.
+        """
         for path in validate_paths(paths):
             self._item.Attachments.Add(str(path))
 
@@ -228,6 +250,7 @@ class MailItem(ItemModel):
 
     @property
     def size_mb(self) -> float:
+        """Return the message size in mebibytes, rounded to two decimals."""
         return round(self.size / (1024**2), 2)
 
     @property
@@ -241,9 +264,17 @@ class MailItem(ItemModel):
 
     # Actions
     def show(self) -> None:
+        """Open the message in an Outlook inspector window."""
         self._item.Display()
 
     def send(self) -> None:
+        """Resolve recipients and send the message.
+
+        Raises
+        ------
+        ValueError
+            If the sender or all delivery recipients are missing.
+        """
         if not self.sent_for:
             raise ValueError(f"Cannot send {self.subject!r}: sender is missing.")
         if not any(self.delivery_recipients):
@@ -253,9 +284,22 @@ class MailItem(ItemModel):
         self._item.Send()
 
     def save(self) -> None:
+        """Save the message in Outlook."""
         self._item.Save()
 
     def export(self, path: StrPath) -> bool:
+        """Export the message to a file.
+
+        Parameters
+        ----------
+        path : str or Path
+            Destination file path. Missing parent directories are created.
+
+        Returns
+        -------
+        bool
+            ``True`` when Outlook saves the message successfully.
+        """
         target = Path(path).expanduser().resolve()
         target.parent.mkdir(parents=True, exist_ok=True)
         try:
@@ -266,13 +310,40 @@ class MailItem(ItemModel):
             return False
 
     def delete(self) -> None:
+        """Delete the message from Outlook."""
         self._item.Delete()
 
     def move(self, folder: Folder) -> MailItem | None:
+        """Move the message to another folder.
+
+        Parameters
+        ----------
+        folder : Folder
+            Destination folder.
+
+        Returns
+        -------
+        MailItem or None
+            The moved message, if Outlook returns an accessible object.
+        """
         item = self._item.Move(folder._ol_folder_item)
         return MailItem.from_outlook_item(item)
 
     def update(self, **kwargs: Any) -> None:
+        """Set supported fields and save the message.
+
+        Parameters
+        ----------
+        **kwargs : Any
+            Message fields and their new values. Supported fields are
+            ``sent_for``, ``to``, ``cc``, ``bcc``, ``subject``, ``body``,
+            ``html``, ``deliver_at``, and ``unread``.
+
+        Raises
+        ------
+        ValueError
+            If any field is unsupported or a property rejects its value.
+        """
         unsupported = [key for key in kwargs if key not in self._UPDATABLE_FIELDS]
         if unsupported:
             raise ValueError(f"Unsupported fields: {unsupported}")
@@ -282,6 +353,7 @@ class MailItem(ItemModel):
 
     # Serialization
     def as_dict(self) -> dict[str, Any]:
+        """Return the message's serializable fields as a dictionary."""
         data = {
             "thread_index": self.thread_index,
             "thread_id": self.thread_id,
@@ -307,6 +379,22 @@ class MailItem(ItemModel):
         width: int | None = 100,
         body_limit: int | None = 80,
     ) -> str:
+        """Render message details as a two-column table.
+
+        Parameters
+        ----------
+        format : str, default="github"
+            Table format accepted by :func:`tabulate.tabulate`.
+        width : int or None, default=100
+            Maximum rendered column width.
+        body_limit : int or None, default=80
+            Maximum number of body characters, or ``None`` for no limit.
+
+        Returns
+        -------
+        str
+            Rendered table text.
+        """
         folder = self.folder
         from tabulate import tabulate
 

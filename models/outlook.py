@@ -15,7 +15,23 @@ logger = logging.getLogger(__name__)
 
 
 class Outlook:
-    """Main Outlook application interface."""
+    """Connect to Outlook and expose the selected account.
+
+    Parameters
+    ----------
+    address : str, optional
+        Display name or SMTP address of the account to select.
+    app : OlApplication, optional
+        Existing Outlook application object, primarily for dependency injection.
+    mapi : OlNamespace, optional
+        Existing MAPI namespace, primarily for dependency injection.
+
+    Raises
+    ------
+    OutlookError
+        If Outlook cannot be opened, has no configured accounts, or ``address``
+        does not match an account.
+    """
 
     def __init__(
         self,
@@ -46,7 +62,7 @@ class Outlook:
 
     @cached_property
     def accounts(self) -> list[Account]:
-        """List all accounts."""
+        """Return all accounts in the active Outlook profile."""
         return unpack_collection(
             self._require_mapi().Accounts,
             transformer=Account,
@@ -68,12 +84,37 @@ class Outlook:
         return self.account
 
     def find_account(self, value: str) -> Account | None:
+        """Find an account by display name or SMTP address.
+
+        Parameters
+        ----------
+        value : str
+            Case-insensitive display name or SMTP address.
+
+        Returns
+        -------
+        Account or None
+            The matching account, if present.
+        """
         return next(
             (account for account in self.accounts if account.matches(value)),
             None,
         )
 
     def new_email(self) -> MailItem:
+        """Create a new email for the selected account.
+
+        Returns
+        -------
+        MailItem
+            A new unsaved email message.
+
+        Raises
+        ------
+        OutlookError
+            If the connection is closed, no account is selected, or Outlook
+            does not return an accessible mail item.
+        """
         item: OlMailItem = self._require_app().CreateItem(0)
         item.SentOnBehalfOfName = self.address or self._require_account().email_address
         mail = MailItem.from_outlook_item(item)

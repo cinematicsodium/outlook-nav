@@ -8,7 +8,6 @@ from outlook import Outlook, OutlookError
 from outlook.cli.app import app
 from outlook.enums import ItemType
 from outlook.services.client import _select_account
-
 from outlook.tests.test_model_navigation import FakeAccount, FakeCollection, FakeFolder
 
 

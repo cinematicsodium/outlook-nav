@@ -1,7 +1,10 @@
 from __future__ import annotations
+
 import logging
+
 import typer
-from .commands import drafts, folders, accounts, messages
+
+from .commands import accounts, drafts, folders, messages
 from .context import CLIState
 
 app = typer.Typer(
@@ -43,4 +46,5 @@ def main(
 
 
 def run() -> None:
+    """Run the Outlook command-line application."""
     app()

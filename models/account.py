@@ -10,14 +10,19 @@ from .folder import Folder
 
 
 class Account(ItemModel):
-    """Represents an Outlook account."""
+    """Represent an Outlook account.
+
+    Parameters
+    ----------
+    ol_acct_item : OlAccount
+        Outlook account COM object to wrap.
+    """
 
     item_type = ItemType.ACCOUNT
     required_properties = ("DisplayName", "SmtpAddress", "DeliveryStore")
     inaccessible_error_message = "Provided Outlook item is not an accessible account."
 
     def __init__(self, ol_acct_item: OlAccount) -> None:
-        """Initialize Account with an Outlook account item."""
         super().__init__(ol_acct_item)
         self.ol_item = ol_acct_item
         self._default_folders: dict[FolderEnum, Folder] = {}
@@ -50,7 +55,18 @@ class Account(ItemModel):
         return root.subfolders
 
     def default_folder(self, folder: FolderEnum) -> Folder | None:
-        """Return one of this account's default folders."""
+        """Return one of the account's default folders.
+
+        Parameters
+        ----------
+        folder : FolderEnum
+            Built-in folder to resolve.
+
+        Returns
+        -------
+        Folder or None
+            The wrapped default folder, if it is accessible.
+        """
         if folder not in self._default_folders:
             resolved = Folder.from_outlook_item(self.store.GetDefaultFolder(folder))
             if resolved is not None:
@@ -58,7 +74,18 @@ class Account(ItemModel):
         return self._default_folders.get(folder)
 
     def find_folder(self, path: str | Iterable[str]) -> Folder | None:
-        """Find a folder by path or iterable of folder names."""
+        """Find a folder below the account root.
+
+        Parameters
+        ----------
+        path : str or iterable of str
+            Slash-delimited path or ordered folder names.
+
+        Returns
+        -------
+        Folder or None
+            The matching folder, or ``None`` when the path cannot be resolved.
+        """
         parts: list[str]
         if isinstance(path, str):
             parts = [segment.strip() for segment in path.split("/") if segment.strip()]
@@ -78,7 +105,18 @@ class Account(ItemModel):
         return current
 
     def matches(self, value: str | None) -> bool:
-        """Return True when the value matches the account name or address."""
+        """Check an account name or address for a case-insensitive match.
+
+        Parameters
+        ----------
+        value : str or None
+            Display name or SMTP address to compare.
+
+        Returns
+        -------
+        bool
+            ``True`` when the value identifies this account.
+        """
         if not value:
             return False
         target = value.lower()

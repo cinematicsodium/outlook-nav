@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from ..enums import ItemType
 from ..protocols import OlAddressEntry
 from ..utils import get_smtp_address
@@ -6,7 +7,13 @@ from .base import ItemModel
 
 
 class AddressEntry(ItemModel):
-    """Represents an Outlook address entry."""
+    """Represent an Outlook address entry.
+
+    Parameters
+    ----------
+    ol_address_entry : OlAddressEntry
+        Outlook address entry COM object to wrap.
+    """
 
     item_type = ItemType.ADDRESS_ENTRY
     required_properties = (

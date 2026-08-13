@@ -14,6 +14,8 @@ from ..models.outlook import Outlook
 
 @dataclass(slots=True)
 class CLIState:
+    """Global account selection and logging options for a CLI invocation."""
+
     account: str | None = None
     verbose: bool = False
 
@@ -37,11 +39,32 @@ DEFAULT_FOLDERS = {
 
 
 def abort(message: str, exit_code: int = 1) -> NoReturn:
+    """Print an error and terminate the CLI command.
+
+    Parameters
+    ----------
+    message : str
+        Error message to print.
+    exit_code : int, default=1
+        Process exit status.
+    """
     typer.secho(message, fg=typer.colors.RED, err=True)
     raise typer.Exit(exit_code)
 
 
 def get_state(ctx: typer.Context) -> CLIState:
+    """Return the CLI state stored on a Typer context.
+
+    Parameters
+    ----------
+    ctx : typer.Context
+        Current command context.
+
+    Returns
+    -------
+    CLIState
+        Stored state, or an empty default state.
+    """
     state = ctx.obj
     if isinstance(state, CLIState):
         return state
@@ -49,6 +72,18 @@ def get_state(ctx: typer.Context) -> CLIState:
 
 
 def create_client(ctx: typer.Context) -> Outlook:
+    """Create an Outlook client from the current CLI state.
+
+    Parameters
+    ----------
+    ctx : typer.Context
+        Current command context.
+
+    Returns
+    -------
+    Outlook
+        Connected Outlook client.
+    """
     state = get_state(ctx)
     try:
         return Outlook(address=state.account)
@@ -63,6 +98,22 @@ def resolve_account(
     ctx: typer.Context,
     account: str | None = None,
 ) -> Account:
+    """Resolve the account selected for a command.
+
+    Parameters
+    ----------
+    client : Outlook
+        Connected Outlook client.
+    ctx : typer.Context
+        Current command context.
+    account : str, optional
+        Command-specific display name or SMTP address.
+
+    Returns
+    -------
+    Account
+        Selected account.
+    """
     state = get_state(ctx)
     selection = account or state.account
     if selection:
@@ -87,6 +138,24 @@ def resolve_folder(
     folder_path: str,
     account: str | None = None,
 ) -> Folder:
+    """Resolve a folder path for a CLI command.
+
+    Parameters
+    ----------
+    client : Outlook
+        Connected Outlook client.
+    ctx : typer.Context
+        Current command context.
+    folder_path : str
+        Folder name or slash-delimited path.
+    account : str, optional
+        Command-specific display name or SMTP address.
+
+    Returns
+    -------
+    Folder
+        Matching folder.
+    """
     normalized_path = folder_path.strip()
     if not normalized_path:
         abort("Folder path cannot be empty.")

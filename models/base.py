@@ -1,12 +1,25 @@
 from __future__ import annotations
+
 from abc import ABC
 from typing import Any, ClassVar, Self
+
 from ..enums import ItemType
 from ..utils import is_accessible_ol_item
 
 
 class ItemModel(ABC):
-    """Base wrapper for COM-backed Outlook items."""
+    """Base wrapper for COM-backed Outlook items.
+
+    Parameters
+    ----------
+    outlook_item : Any
+        Outlook COM object to wrap.
+
+    Raises
+    ------
+    ValueError
+        If the object is inaccessible or is not the expected Outlook type.
+    """
 
     item_type: ClassVar[ItemType]
     required_properties: ClassVar[tuple[str, ...]] = ()
@@ -21,7 +34,18 @@ class ItemModel(ABC):
 
     @classmethod
     def from_outlook_item(cls, outlook_item: Any) -> Self | None:
-        """Construct a model when the wrapped Outlook item is accessible."""
+        """Construct a model from an accessible Outlook item.
+
+        Parameters
+        ----------
+        outlook_item : Any
+            Outlook COM object to wrap.
+
+        Returns
+        -------
+        ItemModel or None
+            A wrapped model, or ``None`` when the item is inaccessible.
+        """
         try:
             return cls(outlook_item)
         except ValueError:
@@ -29,7 +53,18 @@ class ItemModel(ABC):
 
     @classmethod
     def is_accessible(cls, outlook_item: Any) -> bool:
-        """Validate an Outlook item against the expected class and interface."""
+        """Check an Outlook item against the expected class and interface.
+
+        Parameters
+        ----------
+        outlook_item : Any
+            Outlook COM object to inspect.
+
+        Returns
+        -------
+        bool
+            ``True`` when the object can be wrapped by this model.
+        """
         return is_accessible_ol_item(
             item=outlook_item,
             target_type=cls.item_type,
