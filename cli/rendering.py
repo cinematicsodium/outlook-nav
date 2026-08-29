@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-import typer
 from tabulate import tabulate
+
+from .console import console
 
 
 def echo_table(rows: list[tuple[object, ...]], headers: list[str]) -> None:
@@ -17,9 +18,9 @@ def echo_table(rows: list[tuple[object, ...]], headers: list[str]) -> None:
         Column headings.
     """
     if not rows:
-        typer.echo("No results.")
+        console.print("No results.")
         return
-    typer.echo(tabulate(rows, headers=headers, tablefmt="github"))
+    console.print(tabulate(rows, headers=headers, tablefmt="github"))
 
 
 def format_datetime(value: datetime | None) -> str:

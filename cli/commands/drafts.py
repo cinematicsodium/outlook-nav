@@ -4,6 +4,7 @@ from pathlib import Path
 
 import typer
 
+from ..console import console
 from ..context import abort, create_client
 
 app = typer.Typer(
@@ -74,9 +75,9 @@ def create_draft(
         message.add_attachments(attachment)
     if send:
         message.send()
-        typer.secho("Message sent.", fg=typer.colors.GREEN)
+        console.print("[green]Message sent.[/green]")
         return
     message.save()
     if display:
         message.show()
-    typer.secho("Draft created.", fg=typer.colors.GREEN)
+    console.print("[green]Draft created.[/green]")

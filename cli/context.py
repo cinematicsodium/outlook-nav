@@ -10,6 +10,7 @@ from ..exceptions import OutlookError
 from ..models.account import Account
 from ..models.folder import Folder
 from ..models.outlook import Outlook
+from .console import console
 
 
 @dataclass(slots=True)
@@ -86,7 +87,8 @@ def create_client(ctx: typer.Context) -> Outlook:
     """
     state = get_state(ctx)
     try:
-        return Outlook(address=state.account)
+        with console.status("Connecting to Outlook..."):
+            return Outlook(address=state.account)
     except OutlookError as exc:
         abort(str(exc))
 
