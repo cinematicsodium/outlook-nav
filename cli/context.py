@@ -89,8 +89,6 @@ def create_client(ctx: typer.Context) -> Outlook:
         return Outlook(address=state.account)
     except OutlookError as exc:
         abort(str(exc))
-    except Exception as exc:  # ruff: ignore[BLE001]
-        abort(f"Unable to connect to Outlook: {exc}")
 
 
 def resolve_account(

@@ -106,7 +106,7 @@ class Folder(ItemModel):
         if callable(sort):
             try:
                 sort("[ReceivedTime]", True)
-            except Exception:  # ruff: ignore[BLE001]
+            except AttributeError:
                 logger.debug("Unable to sort messages in '%s'", self.name)
         if unread_only:
             restrict = getattr(items, "Restrict", None)
@@ -114,7 +114,7 @@ class Folder(ItemModel):
                 try:
                     items = restrict("[UnRead] = True")
                     unread_only = False
-                except Exception:  # ruff: ignore[BLE001]
+                except AttributeError:
                     logger.debug("Unable to filter unread messages in '%s'", self.name)
         return unpack_collection(
             items,  # type: ignore
@@ -132,7 +132,7 @@ class Folder(ItemModel):
                 self._ol_folder_item.Folders, transformer=Folder
             )
             yield from subfolders
-        except Exception:  # ruff: ignore[BLE001]
+        except AttributeError:
             logger.warning("Unable to enumerate subfolders for '%s'", self.name)
             return
 

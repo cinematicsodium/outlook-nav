@@ -305,7 +305,7 @@ class MailItem(ItemModel):
         try:
             self._item.SaveAs(str(target))
             return True
-        except Exception:
+        except OSError:
             log.exception("Failed to export %r to %r", self.subject, target)
             return False
 

@@ -20,14 +20,14 @@ def _connect() -> Any:
         return _load_dispatch().Dispatch("Outlook.Application")
     except OutlookError:
         raise
-    except Exception as exc:
+    except AttributeError as exc:
         raise OutlookError("Unable to connect to Outlook.") from exc
 
 
 def _open_mapi(app: Any) -> Any:
     try:
         return app.GetNamespace("MAPI")
-    except Exception as exc:
+    except AttributeError as exc:
         raise OutlookError("Unable to open the Outlook MAPI namespace.") from exc
 
 

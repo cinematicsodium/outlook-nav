@@ -39,7 +39,7 @@ def is_accessible_ol_item(
         for name in properties:
             getattr(item, name)
         return True
-    except Exception:  # ruff: ignore[BLE001]
+    except AttributeError:
         return False
 
 
@@ -122,14 +122,14 @@ def get_smtp_address(user: OlAddressEntry) -> LowerStr:
             return ""
         try:
             exch_user = user.GetExchangeUser()
-        except Exception:  # ruff: ignore[BLE001]
+        except AttributeError:
             exch_user = None
         if exch_user:
             return str(exch_user.PrimarySmtpAddress).lower()
         try:
             address = user.PropertyAccessor.GetProperty(SMTP_ADDRESS_SCHEMA)
             return str(address).lower()
-        except Exception:  # ruff: ignore[BLE001]
+        except AttributeError:
             return str(user.Address).lower()
-    except Exception:  # ruff: ignore[BLE001]
+    except AttributeError:
         return ""

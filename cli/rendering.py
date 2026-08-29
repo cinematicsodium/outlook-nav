@@ -37,10 +37,7 @@ def format_datetime(value: datetime | None) -> str:
     """
     if value is None:
         return ""
-    try:
-        return value.strftime("%Y-%m-%d %H:%M")
-    except Exception:  # ruff: ignore[BLE001]
-        return str(value)
+    return value.strftime("%Y-%m-%d %H:%M")
 
 
 def truncate(value: str, width: int = 80) -> str:
