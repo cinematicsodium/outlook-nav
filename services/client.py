@@ -5,6 +5,17 @@ from ..models.account import Account
 
 
 def _load_dispatch() -> Any:
+    """Load the pywin32 COM client module.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    Any
+        pywin32 COM client module.
+    """
     try:
         from win32com import client  # type: ignore
 
@@ -16,6 +27,17 @@ def _load_dispatch() -> Any:
 
 
 def _connect() -> Any:
+    """Connect to the Outlook application.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    Any
+        Outlook application COM object.
+    """
     try:
         return _load_dispatch().Dispatch("Outlook.Application")
     except OutlookError:
@@ -25,6 +47,18 @@ def _connect() -> Any:
 
 
 def _open_mapi(app: Any) -> Any:
+    """Open the MAPI namespace for an Outlook application.
+
+    Parameters
+    ----------
+    app : Any
+        Outlook application COM object.
+
+    Returns
+    -------
+    Any
+        MAPI namespace COM object.
+    """
     try:
         return app.GetNamespace("MAPI")
     except AttributeError as exc:
@@ -34,6 +68,20 @@ def _open_mapi(app: Any) -> Any:
 def _select_account(
     accounts: list[Account], value: str | None = None
 ) -> Account | None:
+    """Select an Outlook account by name or SMTP address.
+
+    Parameters
+    ----------
+    accounts : list of Account
+        Available accounts.
+    value : str, optional
+        Case-insensitive account name or SMTP address.
+
+    Returns
+    -------
+    Account or None
+        Matching account, the sole account, or ``None`` when selection is ambiguous.
+    """
     if not accounts:
         raise OutlookError("Outlook has no configured email accounts.")
     if value:

@@ -19,6 +19,17 @@ app.add_typer(drafts.app, name="drafts")
 
 
 def _configure_logging(verbose: bool) -> None:
+    """Configure application and Rich logging levels.
+
+    Parameters
+    ----------
+    verbose : bool
+        Enable debug-level logging.
+
+    Returns
+    -------
+    None
+    """
     level = logging.DEBUG if verbose else logging.INFO
     logging.getLogger().setLevel(level)
     logging.getLogger("rich").setLevel(level)

@@ -50,7 +50,28 @@ def unpack_collection(
     transformer: None = None,
     limit: int | None = None,
     predicate: Callable[[T], bool] | None = None,
-) -> list[T]: ...
+) -> list[T]:
+    """Type an unpacked collection without model transformation.
+
+    Parameters
+    ----------
+    collection : OlCollection[T], optional
+        Collection to unpack.
+    transformer : None, default=None
+        Disable model transformation.
+    limit : int, optional
+        Maximum number of matching items.
+    predicate : callable, optional
+        Filter applied to each item.
+
+    Returns
+    -------
+    list of T
+        Unpacked collection items.
+    """
+    ...  # noqa: PIE790
+
+
 @overload
 def unpack_collection(
     collection: OlCollection[RawT] | None,
@@ -58,7 +79,28 @@ def unpack_collection(
     transformer: type[ModelT],
     limit: int | None = None,
     predicate: Callable[[RawT], bool] | None = None,
-) -> list[ModelT]: ...
+) -> list[ModelT]:
+    """Type an unpacked collection with model transformation.
+
+    Parameters
+    ----------
+    collection : OlCollection[RawT], optional
+        Collection to unpack.
+    transformer : type[ModelT]
+        Model class used to wrap raw items.
+    limit : int, optional
+        Maximum number of matching items.
+    predicate : callable, optional
+        Filter applied to each raw item.
+
+    Returns
+    -------
+    list of ModelT
+        Wrapped collection items.
+    """
+    ...  # noqa: PIE790
+
+
 def unpack_collection(
     collection: OlCollection[T] | None,
     *,

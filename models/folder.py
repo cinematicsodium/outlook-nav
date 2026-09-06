@@ -51,6 +51,17 @@ class Folder(ItemModel):
     inaccessible_error_message = "Provided Outlook item is not an accessible folder."
 
     def __init__(self, item: OlFolder) -> None:
+        """Initialize a folder wrapper.
+
+        Parameters
+        ----------
+        item : OlFolder
+            Outlook folder COM object.
+
+        Returns
+        -------
+        None
+        """
         super().__init__(item)
         self._ol_folder_item = item
 
@@ -333,6 +344,17 @@ class Folder(ItemModel):
         self._ol_folder_item.Delete()
 
     def __iter__(self):
+        """Iterate over the folder's messages.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Iterator of MailItem
+            Messages in the folder.
+        """
         yield from self.list_messages()
 
     def __repr__(self) -> str:

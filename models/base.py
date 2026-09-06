@@ -28,6 +28,22 @@ class ItemModel(ABC):
     )
 
     def __init__(self, outlook_item: Any) -> None:
+        """Initialize a model with an accessible Outlook item.
+
+        Parameters
+        ----------
+        outlook_item : Any
+            Outlook COM object to wrap.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        ValueError
+            If the item is inaccessible or has an unexpected type.
+        """
         if not self.is_accessible(outlook_item):
             raise ValueError(self.inaccessible_error_message)
         self.ol_item = outlook_item

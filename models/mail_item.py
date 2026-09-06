@@ -67,6 +67,17 @@ class MailItem(ItemModel):
     inaccessible_error_message = "Provided Outlook item is not an accessible mail item."
 
     def __init__(self, item: OlMailItem):
+        """Initialize a mail-item wrapper.
+
+        Parameters
+        ----------
+        item : OlMailItem
+            Outlook mail-item COM object.
+
+        Returns
+        -------
+        None
+        """
         super().__init__(item)
         self._item = item
 
@@ -117,6 +128,17 @@ class MailItem(ItemModel):
 
     @sent_for.setter
     def sent_for(self, value: str) -> None:
+        """Set the sending identity.
+
+        Parameters
+        ----------
+        value : str
+            Sender name or email address.
+
+        Returns
+        -------
+        None
+        """
         self._item.SentOnBehalfOfName = validate_email(value) if value else ""
 
     @property
@@ -126,6 +148,17 @@ class MailItem(ItemModel):
 
     @to.setter
     def to(self, value: str | Iterable[str]) -> None:
+        """Set primary recipients.
+
+        Parameters
+        ----------
+        value : str or iterable of str
+            Recipient addresses.
+
+        Returns
+        -------
+        None
+        """
         self._item.To = validate_email(value) if value else ""
 
     @property
@@ -135,6 +168,17 @@ class MailItem(ItemModel):
 
     @cc.setter
     def cc(self, value: str | Iterable[str]) -> None:
+        """Set carbon-copy recipients.
+
+        Parameters
+        ----------
+        value : str or iterable of str
+            Recipient addresses.
+
+        Returns
+        -------
+        None
+        """
         self._item.CC = validate_email(value) if value else ""
 
     @property
@@ -144,6 +188,17 @@ class MailItem(ItemModel):
 
     @bcc.setter
     def bcc(self, value: str | Iterable[str]) -> None:
+        """Set blind-carbon-copy recipients.
+
+        Parameters
+        ----------
+        value : str or iterable of str
+            Recipient addresses.
+
+        Returns
+        -------
+        None
+        """
         self._item.BCC = validate_email(value) if value else ""
 
     @property
@@ -173,6 +228,17 @@ class MailItem(ItemModel):
 
     @subject.setter
     def subject(self, value: str) -> None:
+        """Set the message subject.
+
+        Parameters
+        ----------
+        value : str
+            Subject text.
+
+        Returns
+        -------
+        None
+        """
         self._item.Subject = value or ""
 
     @property
@@ -182,6 +248,17 @@ class MailItem(ItemModel):
 
     @body.setter
     def body(self, value: str) -> None:
+        """Set the plain-text message body.
+
+        Parameters
+        ----------
+        value : str
+            Body text.
+
+        Returns
+        -------
+        None
+        """
         self._item.Body = value or ""
 
     @property
@@ -191,6 +268,17 @@ class MailItem(ItemModel):
 
     @html.setter
     def html(self, value: str) -> None:
+        """Set the HTML message body.
+
+        Parameters
+        ----------
+        value : str
+            HTML text containing an ``<html>`` element.
+
+        Returns
+        -------
+        None
+        """
         value = value or ""
         if "html" not in value.lower():
             raise ValueError("HTML body must contain an <html> root element.")
@@ -229,6 +317,17 @@ class MailItem(ItemModel):
 
     @deliver_at.setter
     def deliver_at(self, value: datetime) -> None:
+        """Set the deferred-delivery timestamp.
+
+        Parameters
+        ----------
+        value : datetime
+            Deferred-delivery time.
+
+        Returns
+        -------
+        None
+        """
         dt = validate_datetime(value)
         if dt:
             self._item.DeferredDeliveryTime = dt
@@ -260,6 +359,17 @@ class MailItem(ItemModel):
 
     @unread.setter
     def unread(self, value: bool) -> None:
+        """Set the message unread state.
+
+        Parameters
+        ----------
+        value : bool
+            Whether the message is unread.
+
+        Returns
+        -------
+        None
+        """
         self._item.UnRead = value
 
     # Actions
@@ -427,6 +537,18 @@ class MailItem(ItemModel):
     # Internals
     @staticmethod
     def _format(value: Any):
+        """Normalize a display value.
+
+        Parameters
+        ----------
+        value : Any
+            Value to format.
+
+        Returns
+        -------
+        Any
+            Normalized string or original value.
+        """
         if isinstance(value, str):
             return "\n".join(
                 " ".join(line.split()) for line in value.splitlines() if line.strip()
@@ -435,6 +557,20 @@ class MailItem(ItemModel):
 
     @classmethod
     def _format_body(cls, body: str, char_limit: int | None = None):
+        """Normalize and optionally truncate message body text.
+
+        Parameters
+        ----------
+        body : str
+            Body text to format.
+        char_limit : int, optional
+            Maximum number of characters to return.
+
+        Returns
+        -------
+        str
+            Formatted body text.
+        """
         if not isinstance(body, str) or not body:
             return ""
         body = cls._format(body)
@@ -442,6 +578,18 @@ class MailItem(ItemModel):
 
     @staticmethod
     def _format_dt(value: datetime | None) -> str:
+        """Format a plausible Outlook timestamp.
+
+        Parameters
+        ----------
+        value : datetime, optional
+            Timestamp to format.
+
+        Returns
+        -------
+        str
+            Timestamp text or an empty string.
+        """
         if value is None:
             return ""
         try:
@@ -451,15 +599,48 @@ class MailItem(ItemModel):
 
     @property
     def _status(self) -> str:
+        """Return the message status timestamp.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        str
+            Sent time, received time, or ``"Draft"``.
+        """
         return str(self.sent_at or self.received_at or "Draft")
 
     def __str__(self) -> str:
+        """Return a concise message description.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        str
+            Message description.
+        """
         return (
             f"[{self._status}] sender={self.sender_address}, "
             f"subject={self.subject}, recipients={self.recipients}"
         )
 
     def __repr__(self) -> str:
+        """Return a developer representation of the message.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        str
+            Message representation.
+        """
         return (
             f"Mail(subject={self.subject!r}, sender={self.sender_address!r}, "
             f"recipients={self.recipients!r}, sent_at={self.sent_at!r}, "

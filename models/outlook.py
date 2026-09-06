@@ -39,17 +39,54 @@ class Outlook:
         app: OlApplication | None = None,
         mapi: OlNamespace | None = None,
     ) -> None:
+        """Connect to Outlook and optionally select an account.
+
+        Parameters
+        ----------
+        address : str, optional
+            Account display name or SMTP address.
+        app : OlApplication, optional
+            Existing Outlook application COM object.
+        mapi : OlNamespace, optional
+            Existing Outlook MAPI namespace.
+
+        Returns
+        -------
+        None
+        """
         self._app = app or _connect()
         self._mapi = mapi or _open_mapi(self._app)
         self.account = _select_account(self.accounts, address)
         self.address = self.account.email_address if self.account else None
 
     def __repr__(self) -> str:
+        """Return a developer representation of the Outlook connection.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        str
+            Connection representation.
+        """
         return f"Outlook(address={self.address!r}, connected={self._app is not None})"
 
     __str__ = __repr__
 
     def __enter__(self) -> Outlook:  # ruff: ignore[PYI034]
+        """Enter the Outlook connection context.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Outlook
+            Active Outlook connection.
+        """
         return self
 
     def __exit__(
@@ -58,6 +95,21 @@ class Outlook:
         exc: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
+        """Close the Outlook connection when leaving a context.
+
+        Parameters
+        ----------
+        exc_type : type of BaseException, optional
+            Exception type raised in the context.
+        exc : BaseException, optional
+            Exception raised in the context.
+        traceback : TracebackType, optional
+            Traceback for the exception.
+
+        Returns
+        -------
+        None
+        """
         self.close()
 
     @cached_property
@@ -69,16 +121,49 @@ class Outlook:
         )
 
     def _require_app(self) -> OlApplication:
+        """Return the active Outlook application.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        OlApplication
+            Active application COM object.
+        """
         if self._app is None:
             raise OutlookError("Outlook connection is closed or unavailable.")
         return self._app
 
     def _require_mapi(self) -> OlNamespace:
+        """Return the active Outlook MAPI namespace.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        OlNamespace
+            Active MAPI namespace COM object.
+        """
         if self._mapi is None:
             raise OutlookError("Outlook namespace is closed or unavailable.")
         return self._mapi
 
     def _require_account(self) -> Account:
+        """Return the selected Outlook account.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        Account
+            Selected Outlook account.
+        """
         if self.account is None:
             raise OutlookError("No Outlook account is selected.")
         return self.account

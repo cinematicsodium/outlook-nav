@@ -23,6 +23,17 @@ class Account(ItemModel):
     inaccessible_error_message = "Provided Outlook item is not an accessible account."
 
     def __init__(self, ol_acct_item: OlAccount) -> None:
+        """Initialize an account wrapper.
+
+        Parameters
+        ----------
+        ol_acct_item : OlAccount
+            Outlook account COM object.
+
+        Returns
+        -------
+        None
+        """
         super().__init__(ol_acct_item)
         self.ol_item = ol_acct_item
         self._default_folders: dict[FolderEnum, Folder] = {}

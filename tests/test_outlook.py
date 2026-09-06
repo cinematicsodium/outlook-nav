@@ -12,6 +12,17 @@ from outlook.tests.test_model_navigation import FakeAccount, FakeCollection, Fak
 
 
 def _accounts() -> list[outlook.Account]:
+    """Create two fake Outlook accounts.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    list of outlook.Account
+        Fake accounts sharing a root folder.
+    """
     root = FakeFolder("Root")
     return [
         outlook.Account(FakeAccount("First", "first@example.com", root)),
@@ -20,6 +31,16 @@ def _accounts() -> list[outlook.Account]:
 
 
 def test_public_package_and_cli_help_import_normally() -> None:
+    """Verify public imports and CLI help work.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+    """
     assert outlook.Outlook is Outlook
     result = CliRunner().invoke(app, ["--help"])
     assert result.exit_code == 0
@@ -27,6 +48,16 @@ def test_public_package_and_cli_help_import_normally() -> None:
 
 
 def test_account_selection_handles_multiple_accounts_without_guessing() -> None:
+    """Verify ambiguous accounts require an explicit selection.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+    """
     accounts = _accounts()
     assert _select_account(accounts) is None
     assert _select_account(accounts, "SECOND") is accounts[1]
@@ -35,6 +66,16 @@ def test_account_selection_handles_multiple_accounts_without_guessing() -> None:
 
 
 def test_close_releases_cached_com_wrappers() -> None:
+    """Verify closing clears cached Outlook COM wrappers.
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    None
+    """
     account_items = [
         FakeAccount("Only", "only@example.com", FakeFolder("Root")),
     ]

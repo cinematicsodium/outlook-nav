@@ -8,7 +8,20 @@ class OlCollection(Protocol[T]):
 
     Count: int
 
-    def Item(self, index: int, /) -> T: ...
+    def Item(self, index: int, /) -> T:
+        """Return the item at a one-based collection index.
+
+        Parameters
+        ----------
+        index : int
+            One-based item index.
+
+        Returns
+        -------
+        T
+            Item at ``index``.
+        """
+        ...
 
 
 OlAccount: TypeAlias = Any

@@ -28,6 +28,17 @@ class AddressEntry(ItemModel):
     )
 
     def __init__(self, ol_address_entry: OlAddressEntry):
+        """Initialize an address-entry wrapper.
+
+        Parameters
+        ----------
+        ol_address_entry : OlAddressEntry
+            Outlook address-entry COM object.
+
+        Returns
+        -------
+        None
+        """
         super().__init__(ol_address_entry)
         self._ol_address_entry = ol_address_entry
 
